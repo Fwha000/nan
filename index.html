@@ -1,1 +1,167 @@
-藤原
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>藤原 | Portfolio</title>
+    <style>
+        /* 全体の設定（ダークモード仕様） */
+        :root {
+            --primary-color: #00ffcc; /* クールなシアン系のアクセントカラー */
+            --bg-color: #121212;
+            --text-color: #f0f0f0;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow-x: hidden;
+        }
+
+        /* スクロール時のフワッと現れるアニメーション設定 */
+        .hidden {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: all 1s ease-out;
+        }
+        .show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ファーストビュー（一番上の画面） */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 5rem;
+            letter-spacing: 8px;
+            margin: 0;
+            /* 文字が光るアニメーション */
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-top: 10px;
+            letter-spacing: 2px;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px var(--primary-color);
+            }
+            to {
+                text-shadow: 0 0 20px #fff, 0 0 30px var(--primary-color), 0 0 40px var(--primary-color);
+            }
+        }
+
+        /* コンテンツ部分 */
+        .section {
+            padding: 100px 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            min-height: 50vh;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--primary-color);
+            display: inline-block;
+            padding-bottom: 10px;
+        }
+
+        /* カードデザインとホバー時の動き */
+        .card {
+            background: #1e1e1e;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            line-height: 1.8;
+            font-size: 1.1rem;
+        }
+
+        .card:hover {
+            transform: translateY(-10px); /* マウスを乗せると浮き上がる */
+            box-shadow: 0 15px 40px rgba(0, 255, 204, 0.2);
+        }
+
+        /* マウスストーカー（装飾用） */
+        .cursor-glow {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(0,255,204,0.15) 0%, rgba(0,0,0,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            transition: 0.1s ease-out;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cursor-glow" id="cursor"></div>
+
+    <header class="hero">
+        <h1>FUJIWARA</h1>
+        <p class="hidden delay">Welcome to my creative space.</p>
+    </header>
+
+    <section class="section hidden">
+        <h2>About Me</h2>
+        <div class="card">
+            <p>こんにちは、藤原です！</p>
+            <p>新しいアイデアを形にすること、そしてクールなデザインが大好きです。<br>
+            このページは、スクロールに合わせたアニメーションや、<br>マウスの動きに連動するエフェクトを取り入れて作ってみました。</p>
+        </div>
+    </section>
+
+    <section class="section hidden">
+        <h2>My Passions</h2>
+        <div class="card">
+            <p>ここに藤原さんの趣味や得意なこと、これからの目標などを自由に書き込んでください！<br>
+            要素を増やすと、下へスクロールするたびに次々とコンテンツが現れるようになります。</p>
+        </div>
+    </section>
+
+    <script>
+        // 1. スクロール時に要素をフワッと表示させる機能
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('show');
+                }
+            });
+        }, { threshold: 0.1 }); // 10%見えたら発火
+
+        const hiddenElements = document.querySelectorAll('.hidden');
+        hiddenElements.forEach((el) => observer.observe(el));
+
+        // 最初のサブタイトルを少し遅れて表示
+        setTimeout(() => {
+            document.querySelector('.delay').classList.add('show');
+        }, 800);
+
+        // 2. マウスの動きに合わせて背景の光を追従させる機能
+        const cursor = document.getElementById('cursor');
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+        });
+    </script>
+</body>
+</html>
