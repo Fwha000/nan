@@ -3,45 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heart Brave: Hard Mode</title>
+    <title>Heart Brave: Sans-like Battle</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Courier New', Courier, monospace; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Pixelify Sans', 'Courier New', monospace; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap');
         #game-container { position: relative; width: 95vw; height: 65vh; max-width: 800px; border: 4px solid #fff; margin-top: 20px; background: #000; overflow: hidden; }
         canvas { width: 100%; height: 100%; display: block; }
-        #hud { width: 95vw; max-width: 800px; padding: 10px; }
-        .bar-bg { width: 100%; height: 18px; background: #333; border: 2px solid #fff; margin: 4px 0; position: relative; }
-        #p-hp { width: 100%; height: 100%; background: #ff0000; transition: 0.1s; }
-        #b-hp { width: 100%; height: 100%; background: #ffff00; transition: 0.2s; }
-        #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
-        #msg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; }
-        .dialogue { font-size: 1.1rem; color: #fff; border: 2px solid #fff; padding: 15px; background: #000; width: 85%; }
+        #hud { width: 95vw; max-width: 800px; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        #hp-bar-container { width: 300px; height: 18px; background: #333; border: 2px solid #fff; position: relative; }
+        #p-hp { height: 100%; background: #ff0000; transition: width 0.1s linear; }
+        #message-box { font-size: 1.1rem; text-align: left; background: #000; border: 2px solid #fff; padding: 8px; width: 450px; min-height: 50px; box-sizing: border-box; }
+        #start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
+        #msg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; }
+        .dialogue { font-size: 1.5rem; color: #fff; border: 2px solid #fff; padding: 20px; background: #000; width: 70%; text-align: center; }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 95vw; max-width: 400px; padding: 15px; }
         .btn { height: 60px; background: #111; color: #fff; border: 2px solid #fff; font-size: 1.1rem; border-radius: 5px; cursor: pointer; -webkit-user-select: none; }
         .btn:active { background: #fff; color: #000; }
         .blink { animation: blink 0.6s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .dialogue-text { font-size: 1.1rem; line-height: 1.5; }
     </style>
 </head>
 <body>
 
 <div id="hud">
-    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size: 14px;">
-        <span>JUDGEMENT BOSS</span>
-        <span id="phase-name">PHASE 1</span>
-    </div>
-    <div class="bar-bg"><div id="b-hp" style="width:100%"></div></div>
-    <div class="bar-bg"><div id="p-hp" style="width:100%"></div></div>
+    <span style="font-size: 1.2rem;">HP</span>
+    <div id="hp-bar-container"><div id="p-hp" style="width:100%;"></div></div>
+    <div id="message-box"></div>
 </div>
 
 <div id="game-container">
     <div id="start-overlay" onclick="startGame()">
-        <h1 style="color:#fff; font-size: 2.5rem; margin:0; letter-spacing: 4px;">HEART BRAVE</h1>
-        <p>難易度を調整しました</p>
+        <h1 style="color:#fff; font-size: 2.5rem; margin:0; letter-spacing: 2px;">BAD TIME SIMULATOR</h1>
+        <p>A friendly hello to a true challenge.</p>
         <p class="blink" style="color: #ffff00;">TAP TO START</p>
     </div>
 
     <div id="msg-layer" onclick="resumeGame()">
-        <div id="msg-box" class="dialogue"></div>
+        <div id="msg-box" class="dialogue">
+            <p id="dialogue-text" class="dialogue-text"></p>
+        </div>
         <p class="blink" style="margin-top:10px; font-size: 20px;">▼</p>
     </div>
     <canvas id="gameCanvas"></canvas>
@@ -60,167 +61,288 @@ const W = 800, H = 600;
 canvas.width = W; canvas.height = H;
 
 let initialized = false, gameActive = false, isPaused = false;
-let hp = 100, bossHp = 100, frame = 0, stage = 1;
-let isResurrecting = false, isClear = false;
-let shake = 0, safety = 0, transition = 0;
+let hp = 92, maxHp = 92; // サンズ戦に合わせてHPを低めに設定
+let frame = 0, currentAttack = 0, attackTimer = 0;
+let shake = 0, gravityModifier = 1.0; // 重力調整用
 
 const keys = {};
-const player = { x: 400, y: 500, w: 18, h: 18, vx: 0, vy: 0, grounded: false };
+const player = { x: 400, y: 500, w: 18, h: 18, vx: 0, vy: 0, grounded: false, inBlueZone: false };
 const floorY = 550;
 
-let bones = [], warnings = [], beams = [];
+let bones = [], blasters = [], platform = {x: W/2 - 100, y: 400, w: 200, h: 10};
 
+// サンズ戦風のメッセージ
+const sansMessages = [
+    "heya.",
+    "you've been busy, huh?",
+    "so, i got a question for ya.",
+    "do you think even the worst person can change...?",
+    "that everyone can be a good person, if they just try?",
+    "...",
+    "heh heh heh...",
+    "alright. get dunked on!", // 最初の不意打ち前
+    "guess that means i can't go easy on ya."
+];
+let currentMessageIndex = 0;
+const messageBox = document.getElementById('message-box');
+const dialogueTextElem = document.getElementById('dialogue-text');
+
+// 攻撃パターン定義 (簡略化)
+const attackPatterns = [
+    // 0: 挨拶と不意打ち
+    { name: "Greeting & Surprise", duration: 240, execute: (f) => {
+        if (f === 1) showGameMessage(sansMessages[0]);
+        if (f === 60) showGameMessage(sansMessages[1]);
+        if (f === 120) showGameMessage(sansMessages[2]);
+        if (f === 180) {
+             showGameMessage(sansMessages[3], () => {
+                // プレイヤーの真上から骨を降らす不意打ち
+                bones.push({ x: player.x - 20, y: -50, w: 40, h: 200, vy: 8, life: 100, type: 'white', dmg: 10 });
+            });
+        }
+    }},
+    // 1: 青骨の波
+    { name: "Blue Bone Wave", duration: 300, execute: (f) => {
+        gravityModifier = 0.5; // 重力弱く
+        if (f % 60 === 0) showGameMessage("don't move while blue.");
+        if (f % 30 === 0) {
+            let side = Math.random() > 0.5 ? -100 : W + 100;
+            let targetY = Math.random() * 200 + 200;
+            bones.push({ x: side, y: targetY, w: 120, h: 30, vx: side < 0 ? 5 : -5, vy: 0, life: 120, type: 'blue', dmg: 8 });
+        }
+    }},
+    // 2: オレンジ骨の連打
+    { name: "Orange Bone Barrage", duration: 300, execute: (f) => {
+        gravityModifier = 1.2; // 重力強く
+        if (f === 1) showGameMessage("move through orange.");
+        if (f % 20 === 0) {
+            let side = Math.random() > 0.5 ? -100 : W + 100;
+            let targetY = Math.random() * 300 + 100;
+            bones.push({ x: side, y: targetY, w: 80, h: 30, vx: side < 0 ? 8 : -8, vy: 0, life: 100, type: 'orange', dmg: 10 });
+        }
+    }},
+    // 3: Gaster Blaster 狙い撃ち
+    { name: "Blaster Shot", duration: 250, execute: (f) => {
+        gravityModifier = 1.0;
+        if (f === 1) showGameMessage("get ready for a bad time.");
+        if (f % 70 === 0) {
+            blasters.push({ x: player.x + (Math.random()-0.5)*100, y: player.y - 150, targetX: player.x, targetY: player.y, timer: 60 });
+        }
+    }},
+    // 4: 骨の床と天井 (プレイヤーを挟み撃ち)
+    { name: "Bone Platforms", duration: 300, execute: (f) => {
+        gravityModifier = 1.0;
+        if (f === 1) showGameMessage("a true nightmare.");
+        if (f % 60 === 0) {
+            let gapY = Math.random() * 200 + 150; // 隙間のY座標
+            let gapSize = Math.random() * 80 + 60; // 隙間の大きさ
+            let speed = Math.random() > 0.5 ? 4 : -4;
+            bones.push({ x: speed > 0 ? -W/2 : W, y: 0, w: W/2, h: gapY, vx: speed, vy: 0, life: 150, type: 'white', dmg: 5 }); // 上の骨
+            bones.push({ x: speed > 0 ? -W/2 : W, y: gapY + gapSize, w: W/2, h: H - (gapY + gapSize), vx: speed, vy: 0, life: 150, type: 'white', dmg: 5 }); // 下の骨
+        }
+    }},
+    // 5: 最終フェーズ (HPが低い場合のみ)
+    { name: "Final Barrage", duration: 400, execute: (f) => {
+        gravityModifier = 1.0;
+        if (f === 1) showGameMessage("you feel your sins crawling on your back.");
+        // Gaster Blasterと骨の同時攻撃
+        if (f % 40 === 0) {
+            let angle = Math.random() * Math.PI * 2;
+            let bx = W/2 + Math.cos(angle) * 350;
+            let by = H/2 + Math.sin(angle) * 250;
+            blasters.push({ x: bx, y: by, targetX: player.x, targetY: player.y, timer: 50 });
+        }
+        if (f % 20 === 0) {
+            let side = Math.random() > 0.5 ? -50 : W + 50;
+            let targetY = Math.random() * 300 + 100;
+            bones.push({ x: side, y: targetY, w: 100, h: 30, vx: side < 0 ? 8 : -8, vy: 0, life: 80, type: 'white', dmg: 10 });
+        }
+    }}
+];
+
+// ゲーム開始処理
 function startGame() {
     if (!initialized) {
         document.getElementById('start-overlay').style.display = 'none';
         gameActive = true; initialized = true;
-        update();
+        showGameMessage(sansMessages[currentMessageIndex++], () => {
+            // 最初のメッセージが表示されたら攻撃開始
+            requestAnimationFrame(update);
+        });
+    }
+}
+
+// ゲーム内メッセージ表示
+function showGameMessage(text, callback = null) {
+    if (text === undefined) return;
+    messageBox.innerText = text;
+    if (callback) {
+        setTimeout(callback, text.length * 80 + 500); // メッセージの長さに応じて表示時間を調整
     }
 }
 
 function showDialogue(text) {
     isPaused = true;
+    dialogueTextElem.innerText = text;
     document.getElementById('msg-layer').style.display = 'flex';
-    document.getElementById('msg-box').innerText = text;
 }
 
 function resumeGame() {
     isPaused = false;
     document.getElementById('msg-layer').style.display = 'none';
-    safety = 80;
+    messageBox.innerText = "";
+    // 攻撃パターンを再開
+    if (currentAttack === 0 && currentMessageIndex < sansMessages.length) {
+        showGameMessage(sansMessages[currentMessageIndex++], () => {
+            if (currentMessageIndex === sansMessages.length) {
+                // "get dunked on!" の後に最初の不意打ちを再開
+                const attack = attackPatterns[0];
+                attack.execute(attack.duration - 1); // 攻撃の最後のフレームをシミュレートして骨を出す
+            } else {
+                resumeGame(); // 次のメッセージを表示
+            }
+        });
+    }
 }
 
+// --- メインループ ---
 function update() {
     if (!gameActive) return;
 
-    if (!isPaused && !isClear) {
+    if (!isPaused) {
         frame++;
         if (shake > 0) shake--;
-        if (safety > 0) safety--;
-        if (transition > 0) transition--;
 
-        // 移動（重力とジャンプを少し強化）
-        if (keys['l-btn']) player.vx = -7.5;
-        else if (keys['r-btn']) player.vx = 7.5;
+        // プレイヤー移動
+        if (keys['l-btn']) player.vx = -7;
+        else if (keys['r-btn']) player.vx = 7;
         else player.vx *= 0.8;
         
-        if (keys['j-btn'] && player.grounded) { player.vy = -16; player.grounded = false; }
-        player.vy += 0.9; // 重力を少し重く
+        if (keys['j-btn'] && player.grounded) { player.vy = -12; player.grounded = false; }
+        player.vy += 0.8 * gravityModifier; // 重力調整
         player.x += player.vx; player.y += player.vy;
 
+        // 接地判定
+        player.grounded = false;
         if (player.y + player.h > floorY) { player.y = floorY - player.h; player.vy = 0; player.grounded = true; }
+        // 簡易プラットフォーム
+        if (player.x < platform.x + platform.w && player.x + player.w > platform.x && player.y + player.h > platform.y && player.y + player.h < platform.y + platform.h + 20 && player.vy >= 0) {
+            player.y = platform.y - player.h; player.vy = 0; player.grounded = true;
+        }
+
         player.x = Math.max(0, Math.min(W - player.w, player.x));
 
-        // --- PHASE 1: 強化された突き上げ ---
-        if (stage === 1 && safety <= 0) {
-            bossHp -= 0.07;
-            if (frame % 40 === 0) { // 間隔を短縮
-                let rx = Math.random() * (W - 70);
-                let wId = Date.now() + Math.random();
-                warnings.push({ id: wId, x: rx, y: 0, w: 60, h: floorY, timer: 35, type: 'floor' }); // 太さを60に
-                setTimeout(() => {
-                    warnings = warnings.filter(w => w.id !== wId);
-                    if(gameActive && !isPaused) bones.push({ x: rx, y: H, w: 60, h: 350, ty: 300, mode: 'up', life: 50 });
-                }, 500); // 発生を早く
-            }
-            if (bossHp <= 0) { stage = 2; bossHp = 0; transition = 120; }
-        } 
-        // --- PHASE 2: 移行 ---
-        else if (stage === 2 && !isResurrecting) {
-            isResurrecting = true;
-            setTimeout(() => {
-                showDialogue("その程度か？\n次は「逃げ場」を無くしてやろう。");
-                bossHp = 100; stage = 3;
-                document.getElementById('phase-name').innerText = "TRUE DESPAIR";
-                document.getElementById('phase-name').style.color = "red";
-            }, 1000);
-        }
-        // --- PHASE 3: 最終形態（安置なし） ---
-        else if (stage === 3 && safety <= 0) {
-            bossHp -= 0.04;
+        // 攻撃パターン実行
+        attackTimer++;
+        const currentAttackDef = attackPatterns[currentAttack];
+        currentAttackDef.execute(attackTimer);
 
-            // サークル・ブラスター
-            if (frame % 140 === 0) {
-                const centerX = W / 2, centerY = H / 2 - 50;
-                const count = 16; // 本数を増加
-                for(let i=0; i<count; i++) {
-                    let angle = (i / count) * Math.PI * 2;
-                    let dx = Math.cos(angle) * 300;
-                    let dy = Math.sin(angle) * 300;
-                    warnings.push({ type: 'beam', x1: centerX + dx, y1: centerY + dy, x2: centerX, y2: centerY, timer: 50 });
-                    setTimeout(() => {
-                        if(gameActive && !isPaused) {
-                            beams.push({ x1: centerX + dx, y1: centerY + dy, x2: centerX, y2: centerY, life: 25 });
-                            shake = 12;
-                        }
-                        if (i === count - 1) warnings = warnings.filter(w => w.type !== 'beam');
-                    }, 800);
-                }
+        if (attackTimer > currentAttackDef.duration) {
+            attackTimer = 0;
+            currentAttack = (currentAttack + 1) % attackPatterns.length; // 次の攻撃へ
+            if (hp < maxHp / 3) { // HPが低い場合は最終フェーズへ移行しやすくする
+                currentAttack = attackPatterns.length - 1; 
             }
-
-            // 横からの骨（安置対策：高さを変える）
-            if (frame % 35 === 0) {
-                let side = Math.random() > 0.5 ? -60 : W + 60;
-                // 地面スレスレか、ジャンプ必須の高さかランダム
-                let ry = Math.random() > 0.5 ? floorY - 40 : floorY - 120; 
-                bones.push({ x: side, y: ry, vx: side < 0 ? 8 : -8, vy: 0, w: 25, h: 150, life: 180 });
-            }
-            
-            if (bossHp <= 0) isClear = true;
+            bones = []; blasters = []; // 攻撃切り替え時に残存オブジェクトをクリア
+            gravityModifier = 1.0; // 重力をリセット
         }
 
         // 当たり判定
         bones.forEach((b, i) => {
-            if (b.mode === 'up') { b.y += (b.ty - b.y) * 0.35; if (b.life < 10) b.y += 50; } 
-            else { b.x += b.vx; }
-            if (player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) { 
-                hp -= 3; // ダメージも少しアップ
-                shake = 10; 
+            b.x += b.vx; b.y += b.vy;
+            b.life--;
+
+            const playerTouchingBone = player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y;
+
+            if (playerTouchingBone) {
+                if (b.type === 'blue') {
+                    if (player.grounded || player.vy === 0) { // 青骨は動かないとダメージ
+                        hp -= b.dmg; shake = 8;
+                    }
+                } else if (b.type === 'orange') {
+                    if (!player.grounded && player.vy !== 0) { // オレンジ骨は動いているとダメージ
+                        hp -= b.dmg; shake = 8;
+                    }
+                } else { // 白骨は常にダメージ
+                    hp -= b.dmg; shake = 8;
+                }
+                bones.splice(i, 1);
             }
-            b.life--; if (b.life <= 0) bones.splice(i, 1);
+            if (b.life <= 0 || b.x < -200 || b.x > W + 200 || b.y < -200 || b.y > H + 200) bones.splice(i, 1);
         });
 
-        beams.forEach((b, i) => {
-            let dist = Math.abs((b.y2-b.y1)*player.x - (b.x2-b.x1)*player.y + b.x2*b.y1 - b.y2*b.x1) / Math.sqrt((b.y2-b.y1)**2 + (b.y2-b.y1)**2 || 1);
-            if (dist < 45) { hp -= 4; shake = 5; }
-            b.life--; if (b.life <= 0) beams.splice(i, 1);
+        blasters.forEach((b, i) => {
+            if (b.timer > 0) { b.timer--; }
+            else { // ビーム発射
+                // プレイヤーの方向へ発射
+                const angle = Math.atan2(player.y - b.y, player.x - b.x);
+                b.beamX = b.x; b.beamY = b.y;
+                b.beamVx = Math.cos(angle) * 25;
+                b.beamVy = Math.sin(angle) * 25;
+                b.beamLife = 30; // ビームの持続時間
+                
+                // ビームの当たり判定
+                if (Math.abs(player.x - b.beamX) < 30 && Math.abs(player.y - b.beamY) < 30) { hp -= 20; shake = 15; }
+                blasters.splice(i, 1); // 1回発射したら消える
+            }
+        });
+
+        // ビーム自体は別のリストで管理
+        blasters.filter(b => b.beamLife > 0).forEach(b => {
+            b.beamX += b.beamVx;
+            b.beamY += b.beamVy;
+            b.beamLife--;
+            // ビームの当たり判定
+            if (Math.abs(player.x - b.beamX) < 30 && Math.abs(player.y - b.beamY) < 30) { hp -= 20; shake = 15; }
         });
     }
 
     draw();
-    if (hp <= 0) { alert("DETERMINATION FAILED..."); location.reload(); return; }
+    document.getElementById('p-hp').style.width = (hp / maxHp * 100) + "%";
+    if (hp <= 0) { showDialogue("...game over. you lost your determination."); gameActive = false; }
     requestAnimationFrame(update);
 }
 
+// --- 描画処理 ---
 function draw() {
     ctx.save();
     if (shake > 0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 
-    // 予兆
-    warnings.forEach(w => {
-        if (w.type === 'floor') {
-            ctx.fillStyle = "rgba(255, 0, 0, 0.5)"; ctx.fillRect(w.x, 0, w.w, floorY);
-        }
-        if (w.type === 'beam') {
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; ctx.setLineDash([5, 5]);
-            ctx.beginPath(); ctx.moveTo(w.x1, w.y1); ctx.lineTo(w.x2, w.y2); ctx.stroke();
-            ctx.setLineDash([]);
-        }
-    });
+    // 地面とプレイヤー境界
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(2, 2, W-4, floorY-2);
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, floorY, W, 5);
+
+    // プラットフォーム
+    ctx.fillStyle = "#fff"; ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
 
     // 骨
-    ctx.fillStyle = "#fff";
-    bones.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
-
-    // ビーム
-    beams.forEach(b => {
-        ctx.strokeStyle = "#fff"; ctx.lineWidth = 50 * (b.life / 25);
-        ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
-        ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 15 * (b.life / 25); ctx.stroke();
+    bones.forEach(b => {
+        if (b.type === 'blue') ctx.fillStyle = "#00f";
+        else if (b.type === 'orange') ctx.fillStyle = "#ffa500";
+        else ctx.fillStyle = "#fff";
+        ctx.fillRect(b.x, b.y, b.w, b.h);
     });
 
-    // ハート
+    // Blaster 警告と描画
+    blasters.forEach(b => {
+        if (b.timer > 0) {
+            ctx.fillStyle = `rgba(255,0,0,${b.timer/60})`; // 警告点滅
+            ctx.beginPath(); ctx.arc(b.x, b.y, 10, 0, Math.PI*2); ctx.fill();
+        } else if (b.beamLife > 0) {
+            // Blaster本体 (簡略化)
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(b.x, b.y, 40, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#000";
+            ctx.beginPath(); ctx.arc(b.x, b.y, 30, 0, Math.PI*2); ctx.fill();
+            
+            // ビーム
+            ctx.strokeStyle = "#0ff"; ctx.lineWidth = 15;
+            ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.beamX, b.beamY); ctx.stroke();
+        }
+    });
+
+    // プレイヤー（ハート）
     ctx.fillStyle = "#f00";
     ctx.beginPath();
     ctx.moveTo(player.x + 9, player.y + 18);
@@ -228,22 +350,10 @@ function draw() {
     ctx.bezierCurveTo(player.x + 14, player.y - 4, player.x + 22, player.y + 4, player.x + 9, player.y + 18);
     ctx.fill();
 
-    // 境界線
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(2, 2, W-4, floorY-2);
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, floorY, W, 5);
-
-    if (isClear) {
-        ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.fillRect(0,0,W,H);
-        ctx.fillStyle = "#000"; ctx.font = "bold 40px Courier New"; ctx.textAlign = "center";
-        ctx.fillText("VICTORY", W/2, H/2);
-    }
-    if (transition > 0) { ctx.fillStyle = `rgba(255,255,255,${transition/120})`; ctx.fillRect(0,0,W,H); }
-
     ctx.restore();
-    document.getElementById('p-hp').style.width = hp + "%";
-    document.getElementById('b-hp').style.width = bossHp + "%";
 }
 
+// --- 入力イベント ---
 const bind = (id) => {
     const el = document.getElementById(id);
     el.onpointerdown = (e) => { e.preventDefault(); keys[id] = true; startGame(); };
@@ -263,7 +373,12 @@ window.onkeyup = (e) => {
     if(e.key === "ArrowRight") keys['r-btn'] = false;
     if(e.key === "ArrowUp" || e.key === " ") keys['j-btn'] = false;
 };
+
+// 初期描画
 draw();
+showGameMessage(sansMessages[currentMessageIndex], () => {
+    currentMessageIndex++;
+});
 </script>
 </body>
 </html>
