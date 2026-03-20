@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS: SPINNING BONES</title>
+    <title>SANS: FAIR SEQUENCE</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
@@ -31,7 +31,7 @@
 
 <div id="game-box">
     <div id="start-screen" class="overlay">
-        <h1>* 骨の回転についてこれるか？</h1>
+        <h1>* 交互に避けてみな。</h1>
         <button class="btn" onclick="init()">はじめる</button>
     </div>
     <div id="death-screen" class="overlay" style="display: none;">
@@ -57,13 +57,14 @@ canvas.width = 600; canvas.height = 400;
 
 let p, hp, bones, blasters, warns, spinners, frame, active, keys, shake = 0, flash = 0;
 let phase = 1, phaseTimer = 500, spiralAngle = 0, cooldown = 0;
+let nextAttackTimer = 60; // 攻撃の間隔を管理
 
 function init() {
     p = { x: 290, y: 300, w: 16, h: 16, vx: 0, vy: 0, mode: 'red', ground: false };
     hp = 92; bones = []; blasters = []; warns = []; spinners = []; frame = 0; keys = {};
-    active = true; phase = 1; phaseTimer = 500; cooldown = 0;
+    active = true; phase = 1; phaseTimer = 500; cooldown = 0; nextAttackTimer = 30;
     document.getElementById('start-screen').style.display = 'none';
-    msg("* 回転する骨に気をつけな。");
+    msg("* 落ち着いて動きを見極めろ。");
     loop();
 }
 
@@ -108,36 +109,49 @@ function update() {
     if (phaseTimer <= 0) {
         phase++;
         phaseTimer = 600;
-        cooldown = 80;
+        cooldown = 100; // フェーズ移行時は長めの休憩
         if (phase === 4) {
             p.mode = 'blue';
             msg("* 無重力だ。ここからは「渦」の時間だぜ。");
         } else {
-            msg("* 攻撃のパターンを変えてやるよ。");
+            msg("* パターンを変えるぜ。ついてこれるか？");
         }
     }
 
-    // --- 攻撃生成 ---
-    if (p.mode === 'red' && cooldown <= 0) {
-        // 下からの突き上げ骨 (160フレームごと)
-        if (frame % 160 === 1) {
-            let safe = Math.floor(Math.random() * 5);
-            for(let i=0; i<6; i++) { if(i!==safe && i!==safe+1) warns.push({x:i*100, w:100, t:60}); }
-        }
-        // 【新】回転骨の追加 (120フレームごと、突き上げと交互に来るように調整)
-        if (frame % 140 === 70) {
-            spinners.push({ x: 650, y: 250 + (Math.random()*80-40), angle: 0, speed: -4 });
-        }
-    }
-
-    if (p.mode === 'blue' && cooldown <= 0) {
-        if (frame % (20 - Math.min(phase, 10)) === 0) {
-            spiralAngle += 0.35;
-            let radius = 280;
-            let bx = 300 + Math.cos(spiralAngle) * radius;
-            let by = 200 + Math.sin(spiralAngle) * radius;
-            let angleToCenter = Math.atan2(200 - by, 300 - bx);
-            blasters.push({ x: bx, y: by, rot: angleToCenter, timer: 45, beam: 0 });
+    // --- 攻撃生成ロジック (単体ずつ出現させる) ---
+    if (cooldown <= 0) {
+        if (p.mode === 'red') {
+            // 他の攻撃（警告、骨、スピナー）がない時だけ次の攻撃を準備
+            if (warns.length === 0 && bones.length === 0 && spinners.length === 0) {
+                nextAttackTimer--;
+                if (nextAttackTimer <= 0) {
+                    if (Math.random() > 0.5) {
+                        // パターン1: 突き上げ骨
+                        let safe = Math.floor(Math.random() * 5);
+                        for(let i=0; i<6; i++) { if(i!==safe && i!==safe+1) warns.push({x:i*100, w:100, t:60}); }
+                    } else {
+                        // パターン2: 回転骨
+                        let dir = Math.random() > 0.5 ? 1 : -1;
+                        spinners.push({ 
+                            x: dir > 0 ? -100 : 700, 
+                            y: 280, 
+                            angle: 0, 
+                            speed: 5 * dir 
+                        });
+                    }
+                    nextAttackTimer = 80; // 攻撃終了後のインターバル
+                }
+            }
+        } else if (p.mode === 'blue') {
+            // 無重力フェーズは「渦」を継続
+            if (frame % (22 - Math.min(phase, 10)) === 0) {
+                spiralAngle += 0.35;
+                let radius = 280;
+                let bx = 300 + Math.cos(spiralAngle) * radius;
+                let by = 200 + Math.sin(spiralAngle) * radius;
+                let angleToCenter = Math.atan2(200 - by, 300 - bx);
+                blasters.push({ x: bx, y: by, rot: angleToCenter, timer: 45, beam: 0 });
+            }
         }
     }
 
@@ -153,17 +167,16 @@ function update() {
         if(b.timer > 60) bones.splice(i, 1);
     });
 
-    // 2. 回転骨 (スピナー)
+    // 2. 回転骨
     spinners.forEach((s, i) => {
         s.x += s.speed;
         s.angle += 0.15;
-        // 2本の骨の端点の座標を計算して判定
         for(let m = -1; m <= 1; m += 2) {
-            let bx = s.x + Math.cos(s.angle) * (40 * m);
-            let by = s.y + Math.sin(s.angle) * (40 * m);
-            if(Math.abs(p.x+8 - bx) < 15 && Math.abs(p.y+8 - by) < 15) { hp -= 1.2; shake = 5; }
+            let bx = s.x + Math.cos(s.angle) * (45 * m);
+            let by = s.y + Math.sin(s.angle) * (45 * m);
+            if(Math.abs(p.x+8 - bx) < 16 && Math.abs(p.y+8 - by) < 16) { hp -= 1.2; shake = 5; }
         }
-        if(s.x < -100) spinners.splice(i, 1);
+        if(s.x < -150 || s.x > 750) spinners.splice(i, 1);
     });
 
     // 3. ビーム
@@ -192,29 +205,22 @@ function draw() {
 
     warns.forEach(w => { ctx.fillStyle = `rgba(255,0,0,0.25)`; ctx.fillRect(w.x, 0, w.w, 380); });
 
-    // 突き上げ骨
     ctx.fillStyle = '#fff';
     bones.forEach(b => {
         let offset = (b.timer < 15) ? (b.timer * 6) : (b.timer > 40) ? (90 - (b.timer-40)*15) : 90;
         ctx.fillRect(b.x, 400-offset, b.w, offset);
     });
 
-    // 回転骨
     spinners.forEach(s => {
-        ctx.save();
-        ctx.translate(s.x, s.y);
-        ctx.rotate(s.angle);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(-40, -4, 80, 8); // 骨の軸
-        ctx.beginPath(); ctx.arc(-40, 0, 8, 0, Math.PI*2); ctx.fill(); // 端の丸み
-        ctx.beginPath(); ctx.arc(40, 0, 8, 0, Math.PI*2); ctx.fill();
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.angle);
+        ctx.fillStyle = '#fff'; ctx.fillRect(-45, -4, 90, 8);
+        ctx.beginPath(); ctx.arc(-45, 0, 8, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(45, 0, 8, 0, Math.PI*2); ctx.fill();
         ctx.restore();
     });
 
-    // ビーム
     blasters.forEach(b => {
-        ctx.save();
-        ctx.translate(b.x, b.y); ctx.rotate(b.rot);
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
         ctx.fillStyle = (b.timer < 15 && b.timer > 0 && frame % 4 < 2) ? '#f00' : '#fff';
         ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-15, -20); ctx.lineTo(-15, 20); ctx.closePath(); ctx.fill();
         if(b.beam > 0) {
