@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS: OVERLAP SPIRAL</title>
+    <title>SANS: ENDLESS TRAINING</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
         #game-box { position: relative; width: 600px; height: 400px; border: 4px solid #fff; background: #000; overflow: hidden; margin-top: 10px; }
         canvas { width: 100%; height: 100%; display: block; }
         #ui { width: 600px; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
-        #hp-bar-bg { width: 150px; height: 20px; background: #400; border: 2px solid #fff; }
+        #hp-bar-bg { width: 200px; height: 20px; background: #400; border: 2px solid #fff; }
         #hp-bar-fill { width: 100%; height: 100%; background: #ff0; transition: width 0.3s; }
         #dialog-box { width: 580px; height: 70px; border: 4px solid #fff; margin-top: 5px; padding: 8px; font-size: 20px; background: #000; box-sizing: border-box; }
         .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
@@ -22,17 +22,17 @@
 <body>
 
 <div id="ui">
-    <div id="mode-display">SPECIAL: OVERLAP SPIRAL</div>
+    <div id="mode-display">TRAINING: HP 999</div>
     <div style="display:flex; align-items:center;">
         HP <div id="hp-bar-bg"><div id="hp-bar-fill"></div></div>
-        <span id="hp-num">92</span>/92
+        <span id="hp-num">999</span>/999
     </div>
 </div>
 
 <div id="game-box">
     <div id="start-screen" class="overlay">
-        <h1>* 隙間が見えるか？</h1>
-        <button class="btn" onclick="init()">地獄をはじめる</button>
+        <h1>* 耐久訓練の時間だ。</h1>
+        <button class="btn" onclick="init()">はじめる</button>
     </div>
     <div id="death-screen" class="overlay" style="display: none;">
         <h1 style="color: #f00;">GAME OVER</h1>
@@ -48,14 +48,14 @@
     <div style="grid-column: 2;"><button class="btn-ctrl" style="width:100%" id="d">↓</button></div>
 </div>
 
-<div id="dialog-box">* 重なるビームをかわせ。</div>
+<div id="dialog-box">* これなら死なないだろ？</div>
 
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 canvas.width = 600; canvas.height = 400;
 
-let p, hp, maxHp = 92, blasters, spinners, frame, active, keys, shake = 0, flash = 0;
+let p, hp, maxHp = 999, blasters, spinners, frame, active, keys, shake = 0, flash = 0;
 let spiralAngle = 0, cooldown = 0, healFlash = 0, spiralCount = 0, attackType = 0;
 
 function init() {
@@ -63,7 +63,7 @@ function init() {
     hp = maxHp; blasters = []; spinners = []; frame = 0; keys = {};
     active = true; cooldown = 30; spiralCount = 0; attackType = 0;
     document.getElementById('start-screen').style.display = 'none';
-    msg("* 重なり、連なり、迫りくる。");
+    msg("* 心ゆくまで避けの練習をしな。");
     loop();
 }
 
@@ -80,7 +80,6 @@ function spawnBlaster() {
     let bx = 300 + Math.cos(spiralAngle) * radius;
     let by = 200 + Math.sin(spiralAngle) * radius;
     let angleToCenter = Math.atan2(200 - by, 300 - bx);
-    // 予告時間を短く(30->25)して密度感を向上
     blasters.push({ x: bx, y: by, rot: angleToCenter, timer: 25, beam: 0 });
 }
 
@@ -107,7 +106,8 @@ function update() {
     if (healFlash > 0) healFlash -= 0.1;
     if (cooldown > 0) cooldown--;
 
-    if (frame % 180 === 0 && hp < maxHp) { hp = Math.min(maxHp, hp + 2); healFlash = 1.0; }
+    // 強化リジェネ (20回復)
+    if (frame % 180 === 0 && hp < maxHp) { hp = Math.min(maxHp, hp + 20); healFlash = 1.0; }
 
     let s = 6.8;
     if (keys['l']) p.vx = -s; else if (keys['r']) p.vx = s; else p.vx *= 0.8;
@@ -118,10 +118,9 @@ function update() {
 
     if (cooldown <= 0) {
         if (attackType === 0) {
-            // 【調整】6フレーム間隔、20連射。角度変化を小さくして重なりを強調。
             if (spiralCount < 20) {
                 if (frame % 6 === 0) {
-                    spiralAngle += 0.38; // 重なりやすい角度
+                    spiralAngle += 0.38;
                     spawnBlaster(); spiralCount++;
                 }
             } else if (blasters.length === 0) {
@@ -136,7 +135,6 @@ function update() {
         }
     }
 
-    // 判定
     spinners.forEach((s, i) => {
         s.x += s.vx; s.y += s.vy; s.angle += s.rotSpeed;
         for(let m = -1; m <= 1; m += 2) {
@@ -148,7 +146,7 @@ function update() {
     });
     blasters.forEach((b, i) => {
         b.timer--;
-        if(b.timer === 0) { b.beam = 18; shake = 8; flash = 0.15; } // 発射時間を少し延長(14->18)
+        if(b.timer === 0) { b.beam = 18; shake = 8; flash = 0.15; }
         if(b.beam > 0) {
             b.beam--;
             let dx = p.x + 8 - b.x, dy = p.y + 8 - b.y;
