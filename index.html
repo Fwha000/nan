@@ -3,209 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heart Brave - Final Fix</title>
+    <title>Heart Brave - Boss Reflect</title>
     <style>
         body {
-            margin: 0; padding: 0; background: #0b0b18; color: white;
-            font-family: sans-serif; overflow: hidden; touch-action: none;
+            margin: 0; padding: 0; background: #050510; color: white;
+            font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none;
             display: flex; flex-direction: column; align-items: center;
         }
-        #ui-top { padding: 10px; font-size: 1.2rem; font-weight: bold; }
-        #container {
-            position: relative; width: 95vw; height: 50vh; 
-            border: 2px solid #444; background: #000;
+        #hud {
+            width: 100%; max-width: 600px; padding: 10px;
+            display: flex; flex-direction: column; gap: 5px;
         }
-        canvas { width: 100%; height: 100%; display: block; }
+        .bar-container {
+            width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; border: 1px solid #444;
+        }
+        #player-hp-bar { width: 100%; height: 100%; background: #ff4757; transition: width 0.2s; }
+        #boss-hp-bar { width: 100%; height: 100%; background: #a29bfe; transition: width 0.3s; }
+        
+        #game-container {
+            position: relative; width: 95vw; height: 50vh; max-width: 800px;
+            border: 3px solid #444; border-radius: 15px; background: #000;
+        }
+        canvas { width: 100%; height: 100%; display: block; border-radius: 12px; }
+        
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 100; cursor: pointer;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100; cursor: pointer; text-align: center;
         }
         .controls {
-            display: grid; grid-template-columns: repeat(4, 1fr);
-            gap: 10px; padding: 20px; width: 90vw; max-width: 400px;
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 15px; padding: 15px; width: 95vw; max-width: 400px;
         }
         .btn {
-            height: 60px; background: #333; color: white; border: none;
-            border-radius: 10px; font-size: 1rem; font-weight: bold;
-            display: flex; align-items: center; justify-content: center;
-            user-select: none; -webkit-tap-highlight-color: transparent;
+            height: 65px; background: rgba(255,255,255,0.1); color: white; border: 2px solid #444;
+            border-radius: 15px; font-weight: bold; font-size: 1.2rem;
+            display: flex; align-items: center; justify-content: center; user-select: none;
         }
-        .btn:active { background: #666; }
-        .shoot { background: #ff4757; }
+        .btn:active { background: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
 
-<div id="ui-top">SCORE: <span id="score">0</span> | HP: <span id="hp">3</span></div>
+<div id="hud">
+    <div style="font-size: 0.7rem; color: #a29bfe;">BOSS HP</div>
+    <div class="bar-container"><div id="boss-hp-bar"></div></div>
+    <div style="font-size: 0.7rem; color: #ff4757;">PLAYER HP</div>
+    <div class="bar-container"><div id="player-hp-bar"></div></div>
+</div>
 
-<div id="container">
+<div id="game-container">
     <div id="overlay">
-        <h2 style="color:#ff4757; margin:0;">HEART BRAVE</h2>
-        <p>ここをタップして開始</p>
+        <h1 id="title" style="color:#ff4757; margin:0;">HEART BRAVE</h1>
+        <p id="msg">黄色の弾を「踏んで」反射しろ！</p>
+        <p style="font-size: 0.9rem; color: #ffeb3b;">タップで開始</p>
     </div>
     <canvas id="gameCanvas"></canvas>
 </div>
 
 <div class="controls">
     <button class="btn" id="l-btn">←</button>
-    <button class="btn" id="r-btn">→</button>
     <button class="btn" id="j-btn">UP</button>
-    <button class="btn shoot" id="s-btn">HEART</button>
+    <button class="btn" id="r-btn">→</button>
 </div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const hpEl = document.getElementById('hp');
+const pBar = document.getElementById('player-hp-bar');
+const bBar = document.getElementById('boss-hp-bar');
 const overlay = document.getElementById('overlay');
 
-// ゲームの状態
-canvas.width = 800;
-canvas.height = 400;
-let gameActive = false;
-let score = 0;
-let hp = 3;
+canvas.width = 800; canvas.height = 400;
 
-const player = { x: 100, y: 300, w: 40, h: 40, vx: 0, vy: 0, grounded: false };
-const platforms = [
-    {x: 0, y: 380, w: 800, h: 20},
-    {x: 200, y: 280, w: 150, h: 15},
-    {x: 450, y: 200, w: 150, h: 15}
-];
-let enemies = [];
-let hearts = [];
+let gameActive = false;
+let hp = 100, bossHp = 100, frame = 0, shake = 0;
+const player = { x: 100, y: 300, w: 35, h: 35, vx: 0, vy: 0, grounded: false };
+const boss = { x: 900, y: 150, w: 80, h: 80, targetY: 150, active: false };
+const platforms = [{x: 0, y: 360, w: 800, h: 40}, {x: 150, y: 250, w: 120, h: 10}, {x: 530, y: 250, w: 120, h: 10}, {x: 340, y: 160, w: 120, h: 10}];
+let bullets = [];
 const keys = { left: false, right: false };
 
-// 敵生成
-function spawn() {
-    if(!gameActive) return;
-    enemies.push({ x: 850, y: Math.random() * 250 + 50, w: 40, h: 40, speed: Math.random() * 2 + 3 });
-    setTimeout(spawn, 1500);
-}
-
-// 描画：ハート
-function drawHeart(x, y) {
-    ctx.fillStyle = "#ff4757";
-    ctx.beginPath();
-    ctx.arc(x+10, y+10, 10, 0, Math.PI*2);
-    ctx.fill();
+function spawnBullet(x, y, vx, vy, type) {
+    bullets.push({ x, y, vx, vy, type, size: type === 'reflect' ? 12 : 8 });
 }
 
 function update() {
     if(!gameActive) return;
+    frame++;
 
-    // 移動
-    if(keys.left) player.vx = -6;
-    else if(keys.right) player.vx = 6;
-    else player.vx *= 0.8;
+    if(shake > 0) shake--;
 
-    player.vy += 0.6; // 重力
-    player.x += player.vx;
-    player.y += player.vy;
+    // プレイヤー物理
+    if(keys.left) player.vx = -6; else if(keys.right) player.vx = 6; else player.vx *= 0.85;
+    player.vy += 0.6; player.x += player.vx; player.y += player.vy;
 
-    // 当たり判定：床
     player.grounded = false;
     platforms.forEach(p => {
-        if(player.x < p.x + p.w && player.x + player.w > p.x &&
-           player.y + player.h > p.y && player.y + player.h < p.y + p.h + 15 && player.vy >= 0) {
-            player.y = p.y - player.h;
-            player.vy = 0;
-            player.grounded = true;
+        if(player.x < p.x + p.w && player.x + player.w > p.x && player.y + player.h > p.y && player.y + player.h < p.y + p.h + 15 && player.vy >= 0) {
+            player.y = p.y - player.h; player.vy = 0; player.grounded = true;
         }
     });
+    player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
 
-    // 範囲制限
-    if(player.x < 0) player.x = 0;
-    if(player.x > 760) player.x = 760;
+    // ボス出現
+    if(frame > 100) boss.active = true;
 
-    // ハート
-    hearts.forEach((h, i) => {
-        h.x += 10;
-        if(h.x > 800) hearts.splice(i, 1);
-    });
+    if(boss.active && bossHp > 0) {
+        boss.x += (680 - boss.x) * 0.05;
+        boss.y += (boss.targetY - boss.y) * 0.03;
+        if(frame % 80 === 0) boss.targetY = Math.random() * 200 + 50;
 
-    // 敵
-    enemies.forEach((en, i) => {
-        en.x -= en.speed;
-        // 衝突：プレイヤー
-        if(player.x < en.x + en.w && player.x + player.w > en.x && player.y < en.y + en.h && player.y + player.h > en.y) {
-            enemies.splice(i, 1);
-            hp--;
-            hpEl.innerText = hp;
-            if(hp <= 0) location.reload();
-        }
-        // 衝突：ハート
-        hearts.forEach((h, hi) => {
-            if(h.x < en.x + en.w && h.x + 20 > en.x && h.y < en.y + en.h && h.y + 20 > en.y) {
-                enemies.splice(i, 1);
-                hearts.splice(hi, 1);
-                score += 100;
-                scoreEl.innerText = score;
+        // 攻撃パターン
+        if(frame % 120 === 0) { // 反射可能弾
+            for(let i=0; i<6; i++) {
+                const a = i * Math.PI / 3;
+                spawnBullet(boss.x + 40, boss.y + 40, Math.cos(a)*3, Math.sin(a)*3, 'reflect');
             }
-        });
-        if(en.x < -50) enemies.splice(i, 1);
+        }
+        if(frame % 50 === 0) spawnBullet(boss.x, boss.y + 40, -7, (Math.random()-0.5)*4, 'normal');
+    }
+
+    // 弾の更新
+    bullets.forEach((b, i) => {
+        if(b.type === 'returned') {
+            b.x += (boss.x + 40 - b.x) * 0.1; b.y += (boss.y + 40 - b.y) * 0.1;
+            if(Math.abs(b.x - (boss.x+40)) < 10 && Math.abs(b.y - (boss.y+40)) < 10) {
+                bullets.splice(i, 1); bossHp -= 5; shake = 10;
+                bBar.style.width = bossHp + "%";
+                if(bossHp <= 0) victory();
+            }
+        } else {
+            b.x += b.vx; b.y += b.vy;
+            // 反射判定（踏む）
+            if(b.type === 'reflect' && player.vy > 0 && Math.abs(player.x + 17 - b.x) < 30 && Math.abs(player.y + 35 - b.y) < 20) {
+                b.type = 'returned'; player.vy = -10;
+            } else if(Math.abs(player.x + 17 - b.x) < 20 && Math.abs(player.y + 17 - b.y) < 20) {
+                bullets.splice(i, 1); hp -= 15; pBar.style.width = hp + "%";
+                if(hp <= 0) location.reload();
+            }
+        }
+        if(b.x < -50 || b.x > 850) bullets.splice(i, 1);
     });
 
-    render();
+    draw();
     requestAnimationFrame(update);
 }
 
-function render() {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, 800, 400);
-    ctx.fillStyle = "#2ecc71";
-    platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
-    ctx.fillStyle = "#3498db";
-    ctx.fillRect(player.x, player.y, player.w, player.h);
-    hearts.forEach(h => drawHeart(h.x, h.y));
-    ctx.fillStyle = "#f1c40f";
-    enemies.forEach(en => ctx.fillRect(en.x, en.y, en.w, en.h));
+function draw() {
+    ctx.save();
+    if(shake > 0) ctx.translate(Math.random()*shake - shake/2, Math.random()*shake - shake/2);
+    
+    ctx.fillStyle = "#050510"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#2d3436"; platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+    // プレイヤー
+    ctx.fillStyle = "#4a90e2"; ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    // ボス
+    if(boss.active && bossHp > 0) {
+        ctx.fillStyle = "#ff4757"; ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
+        ctx.fillStyle = "white"; ctx.fillRect(boss.x + 25, boss.y + 25, 30, 30);
+    }
+
+    bullets.forEach(b => {
+        ctx.fillStyle = b.type === 'reflect' ? "#ffeb3b" : (b.type === 'returned' ? "#00d2ff" : "#ff4757");
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
 }
 
-// 操作
-function jump() { if(player.grounded) player.vy = -13; }
-function shoot() { if(gameActive) hearts.push({ x: player.x + 40, y: player.y + 10 }); }
+function victory() {
+    gameActive = false;
+    document.getElementById('title').innerText = "MISSION COMPLETE";
+    document.getElementById('title').style.color = "#00d2ff";
+    document.getElementById('msg').innerText = "ボスを撃破しました！";
+    overlay.style.display = 'flex';
+}
 
-// イベント紐付け
-overlay.addEventListener('pointerdown', () => {
-    if(!gameActive) {
-        overlay.style.display = 'none';
-        gameActive = true;
-        spawn();
-        update();
-    }
-});
-
-// PCキーボード
-window.addEventListener('keydown', e => {
-    if(e.code === 'ArrowLeft') keys.left = true;
-    if(e.code === 'ArrowRight') keys.right = true;
-    if(e.code === 'Space') jump();
-    if(e.code === 'KeyZ') shoot();
-});
-window.addEventListener('keyup', e => {
-    if(e.code === 'ArrowLeft') keys.left = false;
-    if(e.code === 'ArrowRight') keys.right = false;
-});
-
-// ボタン（マウス・タッチ両対応）
-const bind = (id, start, end) => {
+overlay.addEventListener('pointerdown', () => { if(!gameActive && bossHp > 0) { overlay.style.display = 'none'; gameActive = true; update(); } else if(!gameActive) location.reload(); });
+const bind = (id, k, f) => {
     const el = document.getElementById(id);
-    el.addEventListener('pointerdown', e => { e.preventDefault(); start(); });
-    if(end) {
-        el.addEventListener('pointerup', e => { e.preventDefault(); end(); });
-        el.addEventListener('pointerleave', e => { e.preventDefault(); end(); });
-    }
+    el.addEventListener('pointerdown', e => { e.preventDefault(); if(k) keys[k] = true; if(f) f(); });
+    el.addEventListener('pointerup', e => { if(k) keys[k] = false; });
+    el.addEventListener('pointerleave', e => { if(k) keys[k] = false; });
 };
-
-bind('l-btn', () => keys.left = true, () => keys.left = false);
-bind('r-btn', () => keys.right = true, () => keys.right = false);
-bind('j-btn', jump);
-bind('s-btn', shoot);
-
-render(); // 初期画面
+bind('l-btn', 'left'); bind('r-btn', 'right'); bind('j-btn', null, () => { if(player.grounded) player.vy = -14; });
+draw();
 </script>
 </body>
 </html>
