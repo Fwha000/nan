@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heart Brave: Re-Balanced</title>
+    <title>Heart Brave: Final Adjustment</title>
     <style>
         body {
             margin: 0; background: #000; color: #fff;
@@ -20,15 +20,14 @@
         .bar-bg { width: 100%; height: 16px; background: #333; border: 2px solid #fff; margin: 5px 0; }
         #p-hp { width: 100%; height: 100%; background: #ff0000; transition: 0.1s; }
         #b-hp { width: 100%; height: 100%; background: #ffff00; transition: 0.3s; }
-        
         #overlay, #msg-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             cursor: pointer;
         }
-        #msg-layer { background: rgba(0,0,0,0.7); z-index: 110; display: none; }
-        .dialogue { font-size: 1.5rem; color: #fff; margin-bottom: 20px; border: 4px solid #fff; padding: 30px; background: #000; min-width: 300px; }
+        #msg-layer { background: rgba(0,0,0,0.75); z-index: 110; display: none; }
+        .dialogue { font-size: 1.5rem; color: #fff; margin-bottom: 20px; border: 2px solid #fff; padding: 30px; background: #000; min-width: 300px; }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 95vw; max-width: 450px; padding: 10px; }
         .btn { height: 65px; background: #000; color: #fff; border: 2px solid #fff; font-size: 1.2rem; font-weight: bold; }
         .btn:active { background: #fff; color: #000; }
@@ -56,13 +55,8 @@
     <div id="overlay" onclick="start()">
         <div id="start-screen">
             <h1 style="font-size: 2.5rem; margin: 0;">HEART BRAVE</h1>
-            <p>予兆を避け、反撃のチャンスを待て</p>
-            <div style="text-align:left; border:2px solid #fff; padding:15px; margin:20px 0; font-size: 0.9rem;">
-                ・赤い予兆：骨が突き出す<br>
-                ・黄色の弾：踏んで跳ね返せ！<br>
-                ・ボスの言葉の後は少しの間攻撃が止まります。
-            </div>
-            <p class="blink" style="color:#ffff00;">タップして開始</p>
+            <p>赤い予兆の柱を避け、反撃せよ</p>
+            <p class="blink" style="color:#ffff00; margin-top:20px;">タップして開始</p>
         </div>
         <div id="result-screen" style="display:none;">
             <h1 id="result-title">結果</h1>
@@ -90,7 +84,7 @@ let bossPhase = 1, shake = 0, safetyTimer = 0;
 let s1_subPhase = 0; 
 const player = { x: 600, y: 500, w: 26, h: 26, vx: 0, vy: 0, grounded: false };
 const boss = { x: 1050, y: 250, w: 100, h: 100, targetY: 250 };
-let bullets = [], bones = [], items = [], warnings = [];
+let bullets = [], bones = [], warnings = [];
 const keys = {};
 const floor = {x: 0, y: 570, w: W, h: 30};
 let activePlatforms = [floor];
@@ -104,7 +98,7 @@ function showDialogue(text) {
 function resumeGame() {
     isPaused = false;
     document.getElementById('msg-layer').style.display = 'none';
-    safetyTimer = 90; // 約1.5秒間の猶予を追加
+    safetyTimer = 90;
 }
 
 function update() {
@@ -117,7 +111,6 @@ function update() {
     if(shake > 0) shake--;
     if(safetyTimer > 0) safetyTimer--;
 
-    // プレイヤー操作
     if(keys['ArrowLeft'] || keys['l-btn']) player.vx = -8.5;
     else if(keys['ArrowRight'] || keys['r-btn']) player.vx = 8.5;
     else player.vx *= 0.8;
@@ -132,56 +125,43 @@ function update() {
     });
     player.x = Math.max(0, Math.min(W - player.w, player.x));
 
-    // 形態移行
     if(bossPhase === 1 && bossHp < 75) {
-        bossPhase = 2;
-        document.getElementById('phase-label').innerText = "第二形態";
-        showDialogue("ふむ… 少しはやるようだな。 \n だが次はどうかな？");
+        bossPhase = 2; document.getElementById('phase-label').innerText = "第二形態";
+        showDialogue("ふむ… 少しはやるようだな。\nだが次はどうかな？");
     } else if(bossPhase === 2 && bossHp < 35) {
-        bossPhase = 3;
-        shake = 50;
-        document.getElementById('phase-label').innerText = "最終形態";
-        showDialogue("遊びは終わりだ。 \n 私の全力、受け切れるかな？");
+        bossPhase = 3; shake = 50; document.getElementById('phase-label').innerText = "最終形態";
+        showDialogue("遊びは終わりだ。\n私の全力、受け切れるかな？");
     }
 
-    // 猶予期間中でなければ攻撃を生成
     if(safetyTimer <= 0) {
         if(stage === 1) {
             bossHp -= 0.04;
-            if(frame % 220 === 0) s1_subPhase = (s1_subPhase + 1) % 3;
+            if(frame % 220 === 0) { s1_subPhase = (s1_subPhase + 1) % 3; bones = []; warnings = []; }
             
-            if(s1_subPhase === 0) { // パターンA: 下から
+            if(s1_subPhase === 0) { 
                 if(frame % 45 === 0) {
                     let rx = Math.random()*(W-100);
-                    warnings.push({x: rx, y: 570, w: 40, h: 10, timer: 30});
-                    setTimeout(() => { if(!isPaused) bones.push({ x: rx, y: 600, w: 40, h: 250, targetY: 380, vx: 0, vy: 0, timer: 30, life: 70 }); }, 500);
+                    warnings.push({x: rx, y: 0, w: 50, h: H, timer: 45, type: 'column'});
+                    setTimeout(() => { if(!isPaused && gameActive) bones.push({ x: rx+5, y: 600, w: 40, h: 300, targetY: 350, vx: 0, vy: 0, timer: 20, life: 60 }); }, 750);
                 }
-            } else if(s1_subPhase === 1) { // パターンB: 狙い撃ち
+            } else if(s1_subPhase === 1) {
                 if(frame % 35 === 0) {
                     const side = Math.floor(Math.random() * 4);
                     let bx = side===2?-50:side===3?W+50:Math.random()*W;
                     let by = side===0?-50:side===1?H+50:Math.random()*H;
-                    warnings.push({x: bx, y: by, w: 10, h: 10, timer: 25, isPoint: true});
+                    warnings.push({x: bx, y: by, timer: 30, isPoint: true});
                     const angle = Math.atan2((player.y+13)-by, (player.x+13)-bx);
-                    setTimeout(() => { if(!isPaused) bones.push({ x: bx, y: by, w: 25, h: 25, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, life: 180 }); }, 450);
+                    setTimeout(() => { if(!isPaused && gameActive) bones.push({ x: bx, y: by, w: 25, h: 25, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10, life: 180 }); }, 500);
                 }
-            } else { // パターンC: 横から流れる骨
-                if(frame % 50 === 0) {
-                    bones.push({ x: W, y: 520, w: 30, h: 50, vx: -12, vy: 0, life: 120 });
-                }
+            } else {
+                if(frame % 50 === 0) bones.push({ x: W, y: 520, w: 30, h: 50, vx: -12, vy: 0, life: 120 });
             }
 
             if(bossHp <= 50) { 
-                stage = 2; bossHp = 50; bones = [];
-                activePlatforms.push(
-                    {x: 150, y: 420, w: 200, h: 14, isSpecial: true}, 
-                    {x: 500, y: 340, w: 200, h: 14, isSpecial: true}, 
-                    {x: 850, y: 420, w: 200, h: 14, isSpecial: true}, 
-                    {x: 350, y: 190, w: 500, h: 14, isSpecial: true}
-                );
+                stage = 2; bossHp = 50; bones = []; warnings = [];
+                activePlatforms.push({x: 150, y: 420, w: 200, h: 14, isSpecial: true}, {x: 500, y: 340, w: 200, h: 14, isSpecial: true}, {x: 850, y: 420, w: 200, h: 14, isSpecial: true}, {x: 350, y: 190, w: 500, h: 14, isSpecial: true});
             }
         } else {
-            // ステージ2: ボス本体の弾幕
             const intensity = bossPhase === 1 ? 1 : (bossPhase === 2 ? 1.7 : 2.6);
             boss.y += (boss.targetY - boss.y) * 0.05;
             if(frame % 60 === 0) boss.targetY = Math.random() * 400 + 50;
@@ -190,14 +170,11 @@ function update() {
         }
     }
 
-    // 更新処理
     warnings.forEach((w, i) => { w.timer--; if(w.timer <= 0) warnings.splice(i, 1); });
     bones.forEach((b, i) => {
-        if(b.vx === 0 && b.vy === 0) { 
-            b.timer--; if(b.timer < 0) b.y += (b.targetY - b.y) * 0.3;
-            if(b.timer < -20) b.y += 25; 
-        } else { b.x += b.vx; b.y += b.vy; }
-        if(player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) hp -= 3.5;
+        if(b.vx === 0 && b.vy === 0) { b.timer--; if(b.timer < 0) b.y += (b.targetY - b.y) * 0.4; if(b.timer < -15) b.y += 30; }
+        else { b.x += b.vx; b.y += b.vy; }
+        if(player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) hp -= 4;
         b.life--; if(b.life <= 0 || b.y > 650) bones.splice(i, 1);
     });
 
@@ -228,9 +205,13 @@ function draw() {
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 
     warnings.forEach(w => {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
-        if(w.isPoint) ctx.beginPath(), ctx.arc(w.x, w.y, 15, 0, Math.PI*2), ctx.fill();
-        else ctx.fillRect(w.x, w.y, w.w, w.h);
+        if(w.type === 'column') {
+            let a = (Math.sin(frame * 0.4) * 0.2) + 0.3;
+            ctx.fillStyle = `rgba(255, 0, 0, ${a})`; ctx.fillRect(w.x, 0, w.w, H);
+            ctx.fillStyle = "red"; ctx.fillRect(w.x, H-20, w.w, 20);
+        } else if(w.isPoint) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; ctx.beginPath(); ctx.arc(w.x, w.y, 20, 0, Math.PI*2); ctx.fill();
+        }
     });
 
     activePlatforms.forEach(p => {
@@ -241,21 +222,18 @@ function draw() {
         } else { ctx.fillStyle = "#fff"; ctx.fillRect(p.x, p.y, p.w, p.h); }
     });
 
-    // プレイヤー(ハート)
     ctx.fillStyle = "#f00"; ctx.beginPath();
     ctx.moveTo(player.x + 13, player.y + 26);
     ctx.bezierCurveTo(player.x - 5, player.y + 10, player.x + 5, player.y - 5, player.x + 13, player.y + 5);
     ctx.bezierCurveTo(player.x + 21, player.y - 5, player.x + 31, player.y + 10, player.x + 13, player.y + 26);
     ctx.fill();
 
-    // ボス
     if(stage === 2) {
         ctx.fillStyle = bossPhase === 3 ? (frame % 4 < 2 ? "#f00" : "#fff") : (bossPhase === 2 ? "#ff0" : "#fff");
         ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
         ctx.strokeStyle = "#00ffff"; ctx.lineWidth = 4; ctx.strokeRect(boss.x, boss.y, boss.w, boss.h);
     }
 
-    // 骨と弾
     ctx.fillStyle = "#fff";
     bones.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
     bullets.forEach(b => {
@@ -266,16 +244,13 @@ function draw() {
 
     if(stage === 1 && safetyTimer <= 0 && frame % 220 < 70) {
         ctx.fillStyle = "#fff"; ctx.font = "bold 32px sans-serif"; ctx.textAlign = "center";
-        let msg = ["足元の赤い予兆を避けろ", "飛んでくる骨に注意", "ジャンプで飛び越えろ"][s1_subPhase];
+        let msg = ["赤い予兆の柱を避けろ", "飛んでくる骨に注意", "骨を飛び越えろ"][s1_subPhase];
         ctx.fillText(msg, W/2, H/2 - 50); ctx.textAlign = "left";
     }
-    
-    // セーフティーメッセージ
     if(safetyTimer > 0) {
-        ctx.fillStyle = "#ffff00"; ctx.font = "bold 40px sans-serif"; ctx.textAlign = "center";
+        ctx.fillStyle = "#ffff00"; ctx.font = "bold 45px sans-serif"; ctx.textAlign = "center";
         ctx.fillText("READY?", W/2, H/2); ctx.textAlign = "left";
     }
-
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
@@ -298,14 +273,12 @@ function start() {
 document.getElementById('overlay').addEventListener('pointerdown', start);
 window.addEventListener('keydown', e => { keys[e.code] = true; start(); });
 window.addEventListener('keyup', e => keys[e.code] = false);
-
 const bind = (id) => {
     const el = document.getElementById(id);
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[id] = true; start(); });
     el.addEventListener('pointerup', () => keys[id] = false);
 };
 ['l-btn', 'j-btn', 'r-btn'].forEach(bind);
-
 draw();
 </script>
 </body>
