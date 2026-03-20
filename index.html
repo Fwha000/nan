@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS: ALL-DIRECTION BONES</title>
+    <title>SANS: REGENERATE & SURVIVE</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
@@ -11,7 +11,7 @@
         canvas { width: 100%; height: 100%; display: block; }
         #ui { width: 600px; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
         #hp-bar-bg { width: 150px; height: 20px; background: #400; border: 2px solid #fff; }
-        #hp-bar-fill { width: 100%; height: 100%; background: #ff0; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #ff0; transition: width 0.3s, background 0.3s; }
         #dialog-box { width: 580px; height: 70px; border: 4px solid #fff; margin-top: 5px; padding: 8px; font-size: 20px; background: #000; box-sizing: border-box; }
         .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
         .btn { padding: 10px 30px; font-size: 20px; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; font-family: inherit; margin-top: 15px; }
@@ -31,7 +31,7 @@
 
 <div id="game-box">
     <div id="start-screen" class="overlay">
-        <h1>* 四方八方から骨が来るぜ。</h1>
+        <h1>* 生き残れば、傷は癒える。</h1>
         <button class="btn" onclick="init()">はじめる</button>
     </div>
     <div id="death-screen" class="overlay" style="display: none;">
@@ -55,16 +55,16 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 canvas.width = 600; canvas.height = 400;
 
-let p, hp, bones, blasters, warns, spinners, frame, active, keys, shake = 0, flash = 0;
+let p, hp, maxHp = 92, bones, blasters, warns, spinners, frame, active, keys, shake = 0, flash = 0;
 let phase = 1, phaseTimer = 500, spiralAngle = 0, cooldown = 0;
-let nextAttackTimer = 60; // 攻撃の間隔を管理
+let nextAttackTimer = 60, healFlash = 0;
 
 function init() {
     p = { x: 290, y: 300, w: 16, h: 16, vx: 0, vy: 0, mode: 'red', ground: false };
-    hp = 92; bones = []; blasters = []; warns = []; spinners = []; frame = 0; keys = {};
-    active = true; phase = 1; phaseTimer = 500; cooldown = 0; nextAttackTimer = 30;
+    hp = maxHp; bones = []; blasters = []; warns = []; spinners = []; frame = 0; keys = {};
+    active = true; phase = 1; phaseTimer = 500; cooldown = 0; nextAttackTimer = 30; healFlash = 0;
     document.getElementById('start-screen').style.display = 'none';
-    msg("* どこから来るか、見極めろ。");
+    msg("* 回復を待ちながら耐えろ。");
     loop();
 }
 
@@ -87,7 +87,18 @@ function update() {
     frame++;
     if (shake > 0) shake *= 0.85;
     if (flash > 0) flash -= 0.05;
+    if (healFlash > 0) healFlash -= 0.1;
     if (cooldown > 0) cooldown--;
+
+    // --- 自動回復システム ---
+    // 180フレーム(約3秒)ごとにHPが2回復
+    if (frame % 180 === 0 && hp < maxHp) {
+        hp = Math.min(maxHp, hp + 2);
+        healFlash = 1.0; // 回復エフェクト
+        const bar = document.getElementById('hp-bar-fill');
+        bar.style.background = "#0f0"; // 一瞬緑にする
+        setTimeout(() => bar.style.background = "#ff0", 300);
+    }
 
     // --- 移動制御 ---
     if (p.mode === 'red') {
@@ -110,67 +121,57 @@ function update() {
         phase++;
         phaseTimer = 600;
         cooldown = 100;
+        document.getElementById('mode-display').innerText = "PHASE " + phase + (phase >= 4 ? ": FREE" : ": GRAVITY");
         if (phase === 4) {
             p.mode = 'blue';
-            msg("* 無重力だ。ここからは「渦」の時間だぜ。");
+            msg("* 無重力だ。傷を癒しながら戦いな。");
         } else {
-            msg("* パターンを変えるぜ。ついてこれるか？");
+            msg("* ...まだ死なないのか。しぶといな。");
         }
     }
 
-    // --- 攻撃生成ロジック (単体ずつ出現させる) ---
+    // --- 攻撃生成 ---
     if (cooldown <= 0) {
         if (p.mode === 'red') {
-            // 他の攻撃（警告、骨、スピナー）がない時だけ次の攻撃を準備
             if (warns.length === 0 && bones.length === 0 && spinners.length === 0) {
                 nextAttackTimer--;
                 if (nextAttackTimer <= 0) {
-                    if (Math.random() > 0.4) { // 突き上げ骨の頻度を少し上げる
+                    if (Math.random() > 0.45) {
                         // パターン1: 突き上げ骨
                         let safe = Math.floor(Math.random() * 5);
                         for(let i=0; i<6; i++) { if(i!==safe && i!==safe+1) warns.push({x:i*100, w:100, t:60}); }
                     } else {
-                        // パターン2: 回転骨 (八方飛来)
-                        let spawnSide = Math.floor(Math.random() * 4); // 0:上, 1:下, 2:左, 3:右
+                        // パターン2: 八方回転骨 (高さを必ずプレイヤーに合わせる)
+                        let spawnSide = Math.floor(Math.random() * 4);
                         let startX, startY, targetX, targetY;
-                        let boneSpeed = 3 + (phase * 0.5); // フェーズで速度アップ
+                        let boneSpeed = 3.5 + (phase * 0.4);
 
                         switch(spawnSide) {
-                            case 0: // 上から
-                                startX = Math.random() * 600; startY = -100;
-                                targetX = p.x + (Math.random()*100-50); targetY = 400; // プレイヤー付近に誘導
-                                break;
-                            case 1: // 下から
-                                startX = Math.random() * 600; startY = 500;
-                                targetX = p.x + (Math.random()*100-50); targetY = 0;
-                                break;
-                            case 2: // 左から
-                                startX = -100; startY = Math.random() * 400;
-                                targetX = 600; targetY = p.y + (Math.random()*100-50);
-                                break;
-                            case 3: // 右から
-                                startX = 700; startY = Math.random() * 400;
-                                targetX = 0; targetY = p.y + (Math.random()*100-50);
-                                break;
+                            case 0: startX = Math.random() * 600; startY = -80; break; // 上
+                            case 1: startX = Math.random() * 600; startY = 480; break; // 下
+                            case 2: startX = -80; startY = 250 + (Math.random()*100); break; // 左
+                            case 3: startX = 680; startY = 250 + (Math.random()*100); break; // 右
                         }
-                        let dx = targetX - startX;
-                        let dy = targetY - startY;
+                        // プレイヤーの現在の位置をしっかり狙う
+                        targetX = p.x + 8;
+                        targetY = Math.max(200, p.y + 8); // あまり上空を狙いすぎないように
+
+                        let dx = targetX - startX, dy = targetY - startY;
                         let dist = Math.sqrt(dx*dx + dy*dy);
                         spinners.push({ 
-                            x: startX, y: startY, angle: Math.random() * Math.PI*2, 
+                            x: startX, y: startY, angle: Math.random() * 6,
                             vx: (dx / dist) * boneSpeed, vy: (dy / dist) * boneSpeed,
-                            rotSpeed: (Math.random() > 0.5 ? 0.1 : -0.1) * (1 + phase * 0.1)
+                            rotSpeed: 0.15 + (phase * 0.02)
                         });
                     }
-                    nextAttackTimer = 80 - (phase * 5); // 攻撃終了後のインターバルを短く
+                    nextAttackTimer = 70;
                 }
             }
         } else if (p.mode === 'blue') {
             if (frame % (22 - Math.min(phase * 2, 10)) === 0) {
                 spiralAngle += 0.35;
-                let radius = 280;
-                let bx = 300 + Math.cos(spiralAngle) * radius;
-                let by = 200 + Math.sin(spiralAngle) * radius;
+                let bx = 300 + Math.cos(spiralAngle) * 280;
+                let by = 200 + Math.sin(spiralAngle) * 280;
                 let angleToCenter = Math.atan2(200 - by, 300 - bx);
                 blasters.push({ x: bx, y: by, rot: angleToCenter, timer: 45, beam: 0 });
             }
@@ -184,25 +185,18 @@ function update() {
     bones.forEach((b, i) => {
         b.timer++;
         let offset = (b.timer < 15) ? (b.timer * 6) : (b.timer > 40) ? (90 - (b.timer-40)*15) : 90;
-        if(p.x+2 < b.x+b.w-2 && p.x+p.w-2 > b.x+2 && p.y+p.h > 400-offset) { hp -= 1.5; shake = 10; }
+        if(p.x+2 < b.x+b.w-2 && p.x+p.w-2 > b.x+2 && p.y+p.h > 400-offset) { hp -= 2.0; shake = 10; }
         if(b.timer > 60) bones.splice(i, 1);
     });
-
-    // 2. 回転骨
     spinners.forEach((s, i) => {
-        s.x += s.vx; s.y += s.vy;
-        s.angle += s.rotSpeed; // 回転速度を適用
-
-        // 骨の端点とプレイヤーの判定
+        s.x += s.vx; s.y += s.vy; s.angle += s.rotSpeed;
         for(let m = -1; m <= 1; m += 2) {
             let bx = s.x + Math.cos(s.angle) * (45 * m);
             let by = s.y + Math.sin(s.angle) * (45 * m);
-            if(Math.abs(p.x+8 - bx) < 16 && Math.abs(p.y+8 - by) < 16) { hp -= 1.2; shake = 5; }
+            if(Math.abs(p.x+8 - bx) < 18 && Math.abs(p.y+8 - by) < 18) { hp -= 1.5; shake = 5; }
         }
         if(s.x < -150 || s.x > 750 || s.y < -150 || s.y > 550) spinners.splice(i, 1);
     });
-
-    // 3. ビーム
     blasters.forEach((b, i) => {
         b.timer--;
         if(b.timer === 0) { b.beam = 18; shake = 12; flash = 0.25; }
@@ -210,13 +204,13 @@ function update() {
             b.beam--;
             let dx = p.x + 8 - b.x, dy = p.y + 8 - b.y;
             let dist = Math.abs(dx * Math.sin(-b.rot) + dy * Math.cos(-b.rot));
-            if(dist < 30) hp -= 2.8;
+            if(dist < 32) hp -= 3.0;
         }
         if(b.timer < -20) blasters.splice(i, 1);
     });
 
     let dHp = Math.max(0, Math.ceil(hp));
-    document.getElementById('hp-bar-fill').style.width = (dHp/92*100) + "%";
+    document.getElementById('hp-bar-fill').style.width = (dHp/maxHp*100) + "%";
     document.getElementById('hp-num').innerText = dHp;
     if (hp <= 0 && active) { active = false; document.getElementById('death-screen').style.display = 'flex'; }
 }
@@ -227,13 +221,11 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(0,0,600,400);
 
     warns.forEach(w => { ctx.fillStyle = `rgba(255,0,0,0.25)`; ctx.fillRect(w.x, 0, w.w, 380); });
-
     ctx.fillStyle = '#fff';
     bones.forEach(b => {
         let offset = (b.timer < 15) ? (b.timer * 6) : (b.timer > 40) ? (90 - (b.timer-40)*15) : 90;
         ctx.fillRect(b.x, 400-offset, b.w, offset);
     });
-
     spinners.forEach(s => {
         ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.angle);
         ctx.fillStyle = '#fff'; ctx.fillRect(-45, -4, 90, 8);
@@ -241,7 +233,6 @@ function draw() {
         ctx.beginPath(); ctx.arc(45, 0, 8, 0, Math.PI*2); ctx.fill();
         ctx.restore();
     });
-
     blasters.forEach(b => {
         ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
         ctx.fillStyle = (b.timer < 15 && b.timer > 0 && frame % 4 < 2) ? '#f00' : '#fff';
@@ -254,6 +245,12 @@ function draw() {
     });
 
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 380, 600, 20);
+    
+    // ソウル描画 (回復時は緑色に光る)
+    if (healFlash > 0) {
+        ctx.fillStyle = `rgba(0, 255, 0, ${healFlash})`;
+        ctx.fillRect(p.x-4, p.y-4, p.w+8, p.h+8);
+    }
     ctx.fillStyle = (p.mode === 'red') ? '#f00' : '#22f';
     ctx.fillRect(p.x, p.y, p.w, p.h);
 
