@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS FIGHT - FINAL FIX</title>
+    <title>SANS FIGHT - FAIR & FLASHY</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
@@ -19,7 +19,7 @@
 <body>
 
 <div id="ui">
-    <div id="status">SURVIVE!</div>
+    <div id="status">SURVIVAL</div>
     <div style="display:flex; align-items:center;">
         HP <div id="hp-bar-bg"><div id="hp-bar-fill"></div></div>
         <span id="hp-num">92</span> / 92
@@ -28,12 +28,11 @@
 
 <div id="game-box">
     <div id="start-screen" class="overlay">
-        <h1>* 準備はいいか？</h1>
+        <h1>* 今度こそ、公平にいこう。</h1>
         <button class="btn" onclick="init()">はじめる</button>
     </div>
     <div id="death-screen" class="overlay" style="display: none;">
         <h1 style="color: #f00;">GAME OVER</h1>
-        <p>* 諦めてはいけない...</p>
         <button class="btn" onclick="init()">リトライ</button>
     </div>
     <canvas id="c"></canvas>
@@ -73,66 +72,80 @@ function update() {
     if (shake > 0) shake *= 0.9;
 
     // 移動
-    if (keys['l']) p.vx = -7; else if (keys['r']) p.vx = 7; else p.vx *= 0.8;
+    if (keys['l']) p.vx = -7.5; else if (keys['r']) p.vx = 7.5; else p.vx *= 0.8;
     if (keys['j'] && p.ground) { p.vy = -15; p.ground = false; }
     p.vy += 0.85; p.x += p.vx; p.y += p.vy;
     if (p.y > 380 - p.h) { p.y = 380 - p.h; p.vy = 0; p.ground = true; }
     p.x = Math.max(0, Math.min(600 - p.w, p.x));
 
-    // --- 攻撃：下からの骨 (ランダム配置の修正) ---
-    if (frame % 130 === 1) {
-        // 0〜5のインデックスのうち、1〜2箇所をランダムに安置にする
+    // --- 下からの骨：ランダム配置 ---
+    if (frame % 140 === 1) {
         let safe1 = Math.floor(Math.random() * 6);
-        let safe2 = (safe1 + 3) % 6; 
+        let safe2 = (safe1 + 1) % 6; // 隣り合わせの安置を作って避けやすくする
 
         for(let i=0; i<6; i++) {
             if(i === safe1 || i === safe2) continue;
             let bx = i * 100;
-            warns.push({ x: bx, w: 100, t: 65 });
+            warns.push({ x: bx, w: 100, t: 70 });
             setTimeout(() => {
                 if(active && hp > 0) {
-                    bones.push({ x: bx + 5, y: 400, w: 90, h: 320, vy: -18, life: 40 });
+                    bones.push({ x: bx + 5, y: 400, w: 90, h: 320, vy: -18, life: 45 });
                 }
-            }, 800);
+            }, 1000);
         }
     }
 
-    // --- ブラスター ---
-    if (frame > 500 && frame % 220 === 0) {
-        blasters.push({ x: p.x, y: -60, tx: p.x, ty: 50, timer: 55, beam: 0 });
+    // --- 上からのブラスター：必中回避ロジック ---
+    if (frame > 400 && frame % 200 === 0) {
+        // 出現時はプレイヤーを追うが、一定時間で位置を固定する
+        blasters.push({ 
+            x: p.x, y: -60, 
+            timer: 60, // 準備時間
+            lock: false, // ロックオン状態
+            beam: 0 
+        });
     }
 
-    // 衝突判定とクリーンアップ
+    // ブラスターの個別更新
+    blasters.forEach((b) => {
+        if (b.timer > 20) {
+            // 発射20フレーム前まではプレイヤーをゆるやかに追従
+            b.x += (p.x - b.x) * 0.15;
+        } else if (b.timer > 0) {
+            // 発射直前は位置を固定（ここが避けるチャンス！）
+            b.lock = true;
+        }
+    });
+
+    // 衝突判定
     warns.forEach((w, i) => { w.t--; if(w.t <= 0) warns.splice(i, 1); });
     
     bones.forEach((b, i) => {
         b.y += b.vy; b.life--;
-        // 当たり判定をハートの中心に寄せる (遊びやすさ重視)
         if (p.x + 4 < b.x + b.w && p.x + p.w - 4 > b.x && p.y + 4 < b.y + b.h && p.y + p.h - 4 > b.y) {
-            hp -= 1.2; shake = 10;
+            hp -= 1.0; shake = 8;
         }
         if (b.life <= 0) bones.splice(i, 1);
     });
 
     blasters.forEach((b, i) => {
         if (b.timer > 0) {
-            b.x += (b.tx - b.x) * 0.1; b.timer--;
-            if (b.timer === 0) { b.beam = 25; shake = 15; }
+            b.timer--;
+            if (b.timer === 0) { b.beam = 30; shake = 15; }
         } else {
             b.beam--;
-            if (Math.abs(p.x + 8 - b.x) < 35 && b.beam > 0) { hp -= 2.5; shake = 5; }
+            // ビームの判定（少し細くして避けやすく）
+            if (Math.abs(p.x + 8 - b.x) < 30 && b.beam > 0) { hp -= 2.0; shake = 5; }
             if (b.beam <= 0) blasters.splice(i, 1);
         }
     });
 
-    // HP更新と死亡判定
     let dHp = Math.max(0, Math.ceil(hp));
     document.getElementById('hp-bar-fill').style.width = (dHp / 92 * 100) + "%";
     document.getElementById('hp-num').innerText = dHp;
 
-    if (hp <= 0) {
+    if (hp <= 0 && active) {
         active = false;
-        bones = []; blasters = []; // 画面を掃除
         document.getElementById('death-screen').style.display = 'flex';
     }
 }
@@ -143,35 +156,37 @@ function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 600, 400);
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 380, 600, 20);
 
-    // 警告線 (より派手に点滅)
     warns.forEach(w => {
-        ctx.fillStyle = `rgba(255, 0, 0, ${Math.abs(Math.sin(frame*0.2))*0.5})`;
+        ctx.fillStyle = `rgba(255, 0, 0, 0.3)`;
         ctx.fillRect(w.x, 0, w.w, 380);
     });
 
-    // 骨の描画
     ctx.fillStyle = '#fff';
-    bones.forEach(b => {
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.fillStyle = '#eee'; ctx.fillRect(b.x, b.y, b.w, 5); ctx.fillStyle = '#fff';
-    });
+    bones.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
-    // ブラスター
     blasters.forEach(b => {
-        ctx.fillStyle = b.timer < 10 && b.timer % 2 === 0 ? '#f00' : '#fff';
+        // 本体（ロックオン中は赤くなる）
+        ctx.fillStyle = b.lock ? '#f00' : '#fff';
         ctx.fillRect(b.x - 20, b.y - 20, 40, 40);
+        
+        // 予告ライン
+        if (b.timer > 0) {
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 + (60-b.timer)*0.01})`;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x, 400); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
         if (b.beam > 0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(b.x - 45, b.y + 20, 90, 400);
-            ctx.fillStyle = '#0ff'; ctx.fillRect(b.x - 15, b.y + 20, 30, 400);
+            ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(b.x - 35, b.y + 20, 70, 400);
+            ctx.fillStyle = '#0ff'; ctx.fillRect(b.x - 12, b.y + 20, 24, 400);
         }
     });
 
-    // ハート
     ctx.fillStyle = '#f00'; ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.restore();
 }
 
-// コントローラー設定
 const btn = (id) => {
     const el = document.getElementById(id);
     const start = (e) => { e.preventDefault(); keys[id] = true; };
