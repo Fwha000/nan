@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heart Brave: Survival & Battle</title>
+    <title>Heart Brave: Insane Edition</title>
     <style>
         body {
             margin: 0; background: #05050a; color: #fff;
@@ -25,15 +25,13 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 20px;
-            cursor: pointer; /* クリック可能であることを示す */
+            cursor: pointer;
         }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 95vw; max-width: 450px; padding: 10px; }
         .btn { height: 60px; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 10px; font-size: 1.2rem; outline: none; }
         .btn:active { background: #444; }
         #result-screen { display: none; }
-
-        /* 点滅アニメーションの修正 */
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         .blink-text { animation: blink 1.5s infinite; }
     </style>
 </head>
@@ -41,7 +39,7 @@
 
 <div id="hud">
     <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold;">
-        <span id="stage-text" style="color:#ff9f43;">STAGE 1: DODGE EVERYTHING</span>
+        <span id="stage-text" style="color:#ff9f43;">STAGE 1: SURVIVAL</span>
         <span id="boss-label" style="color:#1e90ff;">???</span>
     </div>
     <div class="bar-bg"><div id="b-hp"></div></div>
@@ -54,17 +52,13 @@
         <div id="start-screen">
             <h1 style="color:#ff4757; font-size: 2.5rem; margin: 0; letter-spacing: 4px;">HEART BRAVE</h1>
             <div style="text-align:left; background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin:15px 0; font-size: 0.85rem; line-height: 1.6; border-left: 4px solid #ff4757;">
-                <b style="color:#ffeb3b;">【MISSION】</b><br>
-                1. 前半：全方位から飛んでくる骨を避け続けろ！<br>
-                2. 後半：足場が出現。黄色の弾を踏みつけて反撃！<br>
-                <b style="color:#ffeb3b;">【CONTROLS】</b><br>
-                ・左右 / 矢印：移動<br>
-                ・JUMP：長押しで高く跳ぶ<br>
-                ・空中＋下：急降下
+                <b style="color:#ffeb3b;">【STAGE 1】</b><br>
+                下からの突き上げと、四方八方からの骨を避けろ！<br>
+                <b style="color:#ffeb3b;">【STAGE 2】</b><br>
+                ボスのHPが減るほど攻撃が激化する。一気に決めろ！
             </div>
-            <p class="blink-text" style="color:#00d2ff;">TAP TO START BATTLE</p>
+            <p class="blink-text" style="color:#00d2ff;">TAP ANYWHERE TO START</p>
         </div>
-
         <div id="result-screen">
             <h1 id="result-title" style="font-size: 2.5rem;">RESULT</h1>
             <p id="result-stats" style="font-size: 1.2rem; line-height: 2;"></p>
@@ -87,19 +81,14 @@ const overlay = document.getElementById('overlay');
 const startScreen = document.getElementById('start-screen');
 const resultScreen = document.getElementById('result-screen');
 
-const W = 1200;
-const H = 600;
-canvas.width = W;
-canvas.height = H;
+const W = 1200, H = 600;
+canvas.width = W; canvas.height = H;
 
-let gameActive = false, hp = 100, bossHp = 100, frame = 0, stage = 1;
-let startTime = 0;
+let gameActive = false, hp = 100, bossHp = 100, frame = 0, stage = 1, startTime = 0;
 const player = { x: 600, y: 500, w: 30, h: 30, vx: 0, vy: 0, grounded: false };
 const boss = { x: 1050, y: 250, w: 120, h: 120, targetY: 250, beamTimer: 0 };
-
 let bullets = [], bones = [], items = [];
 const keys = {};
-
 const floor = {x: 0, y: 570, w: W, h: 30};
 let activePlatforms = [floor];
 
@@ -107,14 +96,13 @@ function update() {
     if(!gameActive) return;
     frame++;
 
+    // プレイヤー制御
     if(keys['ArrowLeft'] || keys['l-btn']) player.vx = -7;
     else if(keys['ArrowRight'] || keys['r-btn']) player.vx = 7;
     else player.vx *= 0.82;
-
     if((keys['ArrowUp'] || keys['j-btn']) && player.grounded) { player.vy = -13; player.grounded = false; }
     if((keys['ArrowUp'] || keys['j-btn']) && player.vy < 0) player.vy -= 0.35;
     if(keys['ArrowDown'] && !player.grounded) player.vy += 2.5;
-
     player.vy += 0.65; player.x += player.vx; player.y += player.vy;
 
     player.grounded = false;
@@ -125,72 +113,66 @@ function update() {
     });
     player.x = Math.max(0, Math.min(W - player.w, player.x));
 
+    // ステージ1: サバイバル
     if(stage === 1) {
-        bossHp -= 0.06;
+        bossHp -= 0.07;
         if(bossHp <= 50) { 
             stage = 2; bossHp = 50; bones = [];
-            activePlatforms.push(
-                {x: 150, y: 400, w: 200, h: 10}, 
-                {x: 500, y: 350, w: 200, h: 10},
-                {x: 850, y: 400, w: 200, h: 10}, 
-                {x: 350, y: 180, w: 500, h: 10}
-            );
+            activePlatforms.push({x: 150, y: 400, w: 200, h: 10}, {x: 500, y: 350, w: 200, h: 10}, {x: 850, y: 400, w: 200, h: 10}, {x: 350, y: 180, w: 500, h: 10});
         }
-        if(frame % 45 === 0) {
-            let rnd = Math.random();
-            if(rnd < 0.4) {
-                bones.push({ x: Math.random()*(W-100), y: 600, w: 35, h: 220, targetY: 420, vx: 0, timer: 40 });
-            } else if(rnd < 0.7) {
-                bones.push({ x: W, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: -9, timer: 0 });
-            } else {
-                bones.push({ x: -100, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: 9, timer: 0 });
-            }
+        // パターンA: 下から突き上げ
+        if(frame % 70 === 0) bones.push({ x: Math.random()*(W-100), y: 600, w: 40, h: 250, targetY: 400, vx: 0, vy: 0, timer: 45 });
+        // パターンB: 四方八方から狙い撃ち
+        if(frame % 50 === 0) {
+            const side = Math.floor(Math.random() * 4);
+            let bx, by;
+            if(side === 0) { bx = Math.random()*W; by = -50; } // 上
+            else if(side === 1) { bx = Math.random()*W; by = H+50; } // 下
+            else if(side === 2) { bx = -50; by = Math.random()*H; } // 左
+            else { bx = W+50; by = Math.random()*H; } // 右
+            const angle = Math.atan2((player.y+15) - by, (player.x+15) - bx);
+            bones.push({ x: bx, y: by, w: 30, h: 30, vx: Math.cos(angle)*7, vy: Math.sin(angle)*7, timer: 0 });
         }
     } else {
+        // ステージ2: ボス戦 (HPに応じて激化)
+        const intensity = bossHp > 30 ? 1 : (bossHp > 15 ? 1.5 : 2.2);
         boss.y += (boss.targetY - boss.y) * 0.05;
         if(frame % 100 === 0) boss.targetY = Math.random() * 300 + 50;
-        boss.beamTimer++;
-        if(boss.beamTimer > 380) boss.beamTimer = 0;
-        if(frame % 160 === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -5, vy: (Math.random()-0.5)*4, type: 'reflect', size: 30 });
-        if(frame % 45 === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -11, vy: (Math.random()-0.5)*9, type: 'normal', size: 10 });
+        
+        boss.beamTimer += intensity;
+        if(boss.beamTimer > 400) boss.beamTimer = 0;
+
+        if(frame % Math.floor(160/intensity) === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -5 * intensity, vy: (Math.random()-0.5)*4, type: 'reflect', size: 30 });
+        if(frame % Math.floor(45/intensity) === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -11 * intensity, vy: (Math.random()-0.5)*12, type: 'normal', size: 10 });
     }
 
+    // オブジェクト更新
     bones.forEach((b, i) => {
-        if(b.vx === 0) { b.timer--; if(b.timer < 0) b.y += (b.targetY - b.y) * 0.15; }
-        else { b.x += b.vx; b.y = b.targetY; }
+        if(b.vx === 0 && b.vy === 0) { b.timer--; if(b.timer < 0) b.y += (b.targetY - b.y) * 0.15; }
+        else { b.x += b.vx; b.y += b.vy; }
         if(player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) hp -= 2.0;
-        if(b.x < -200 || b.x > W + 200) bones.splice(i, 1);
+        if(b.x < -300 || b.x > W + 300 || b.y < -300 || b.y > H + 300) bones.splice(i, 1);
     });
 
     bullets.forEach((b, i) => {
         b.x += b.vx; b.y += b.vy;
         if(b.type === 'returned') {
             b.x += (boss.x + 60 - b.x) * 0.15; b.y += (boss.y + 60 - b.y) * 0.15;
-            if(Math.abs(b.x - boss.x - 60) < 50) { bullets.splice(i, 1); bossHp -= 10; }
+            if(Math.abs(b.x - (boss.x + 60)) < 50) { bullets.splice(i, 1); bossHp -= 10; }
         } else {
-            if(b.type === 'reflect' && player.vy > 0 && Math.abs(player.x - b.x) < 55 && Math.abs(player.y + 30 - b.y) < 45) {
-                b.type = 'returned'; player.vy = -15;
-            } else if(Math.abs(player.x + 15 - b.x) < 22 && Math.abs(player.y + 15 - b.y) < 22) {
-                bullets.splice(i, 1); hp -= 10;
-            }
+            if(b.type === 'reflect' && player.vy > 0 && Math.abs(player.x - b.x) < 60 && Math.abs(player.y + 30 - b.y) < 50) { b.type = 'returned'; player.vy = -15; }
+            else if(Math.abs(player.x + 15 - b.x) < 22 && Math.abs(player.y + 15 - b.y) < 22) { bullets.splice(i, 1); hp -= 10; }
         }
         if(b.x < -100 || b.x > W + 100) bullets.splice(i, 1);
     });
 
     if(frame % 600 === 0) items.push({ x: Math.random()*(W-100), y: 0, vy: 3 });
-    items.forEach((it, i) => {
-        it.y += it.vy;
-        if(Math.abs(player.x - it.x) < 45 && Math.abs(player.y - it.y) < 45) { hp = Math.min(100, hp + 35); items.splice(i, 1); }
-    });
+    items.forEach((it, i) => { it.y += it.vy; if(Math.abs(player.x - it.x) < 45 && Math.abs(player.y - it.y) < 45) { hp = Math.min(100, hp + 35); items.splice(i, 1); } });
 
     document.getElementById('p-hp').style.width = hp + "%";
     document.getElementById('b-hp').style.width = (bossHp * 2) + "%";
-    document.getElementById('stage-text').innerText = stage === 1 ? "STAGE 1: BONE SURVIVAL" : "FINAL STAGE: BOSS BATTLE";
-    document.getElementById('boss-label').innerText = stage === 1 ? "ANALYZING..." : "ANNIHILATOR X";
-
     if(hp <= 0) showResult(false);
     if(bossHp <= 0) showResult(true);
-
     draw();
     requestAnimationFrame(update);
 }
@@ -198,30 +180,25 @@ function update() {
 function draw() {
     ctx.fillStyle = "#010105"; ctx.fillRect(0, 0, W, H);
     activePlatforms.forEach(p => { ctx.fillStyle = "#111122"; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.strokeStyle = "#333"; ctx.strokeRect(p.x, p.y, p.w, p.h); });
-    ctx.fillStyle = "#ff4757"; ctx.shadowBlur = 15; ctx.shadowColor = "#ff4757";
-    ctx.fillRect(player.x, player.y, player.w, player.h);
+    ctx.fillStyle = "#ff4757"; ctx.shadowBlur = 15; ctx.shadowColor = "#ff4757"; ctx.fillRect(player.x, player.y, player.w, player.h);
     ctx.shadowBlur = 0;
     if(stage === 2) {
         ctx.fillStyle = "#1e90ff"; ctx.shadowBlur = 20; ctx.shadowColor = "#1e90ff"; ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
         if(boss.beamTimer > 250 && boss.beamTimer < 320) { ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; ctx.fillRect(0, boss.y + 20, boss.x, 80); }
     }
-    ctx.fillStyle = "#e0e0e0"; bones.forEach(b => { ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = "#fff"; ctx.strokeRect(b.x, b.y, b.w, b.h); });
-    bullets.forEach(b => {
-        ctx.fillStyle = b.type === 'reflect' ? "#fff200" : (b.type === 'returned' ? "#00ffff" : "#ff4757");
-        ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#e0e0e0"; bones.forEach(b => { 
+        if(b.vx !== 0 || b.vy !== 0) { ctx.save(); ctx.translate(b.x+b.w/2, b.y+b.h/2); ctx.rotate(Math.atan2(b.vy, b.vx)); ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h); ctx.restore(); }
+        else ctx.fillRect(b.x, b.y, b.w, b.h); 
     });
-    ctx.shadowBlur = 15; ctx.shadowColor = "#2ed573"; ctx.fillStyle = "#2ed573"; ctx.font = "bold 35px Arial";
-    items.forEach(it => ctx.fillText("✚", it.x, it.y));
+    bullets.forEach(b => { ctx.fillStyle = b.type === 'reflect' ? "#fff200" : (b.type === 'returned' ? "#00ffff" : "#ff4757"); ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill(); });
+    ctx.shadowBlur = 15; ctx.shadowColor = "#2ed573"; ctx.fillStyle = "#2ed573"; ctx.font = "bold 35px Arial"; items.forEach(it => ctx.fillText("✚", it.x, it.y));
     ctx.shadowBlur = 0;
 }
 
 function showResult(isWin) {
-    gameActive = false;
-    overlay.style.display = 'flex';
-    startScreen.style.display = 'none';
-    resultScreen.style.display = 'block';
+    gameActive = false; overlay.style.display = 'flex'; startScreen.style.display = 'none'; resultScreen.style.display = 'block';
     const timeTaken = ((Date.now() - startTime) / 1000).toFixed(2);
-    document.getElementById('result-title').innerText = isWin ? "MISSION COMPLETE" : "MISSION FAILED";
+    document.getElementById('result-title').innerText = isWin ? "DOMINATED" : "PURGED";
     document.getElementById('result-title').style.color = isWin ? "#2ecc71" : "#ff4757";
     document.getElementById('result-stats').innerHTML = `TIME: ${timeTaken}s<br>HP: ${Math.max(0, Math.floor(hp))}%<br>RANK: ${isWin ? (hp > 85 ? "S" : "A") : "F"}`;
 }
@@ -229,25 +206,18 @@ function showResult(isWin) {
 function start() {
     if(!gameActive) {
         if(resultScreen.style.display === 'block') { location.reload(); return; }
-        overlay.style.display = 'none';
-        gameActive = true;
-        startTime = Date.now();
-        update();
+        overlay.style.display = 'none'; gameActive = true; startTime = Date.now(); update();
     }
 }
 
-// キーボードとボタン操作のバインド
-window.addEventListener('keydown', e => { keys[e.code] = true; start(); });
+window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'ArrowUp' || e.code === 'KeyW') start(); });
 window.addEventListener('keyup', e => keys[e.code] = false);
-
 const bind = (id) => {
     const el = document.getElementById(id);
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); keys[id] = true; start(); });
     el.addEventListener('pointerup', (e) => { e.preventDefault(); keys[id] = false; });
 };
 ['l-btn', 'j-btn', 'r-btn'].forEach(bind);
-
-// 初回描画
 draw();
 </script>
 </body>
