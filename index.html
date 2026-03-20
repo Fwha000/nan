@@ -25,11 +25,16 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 20px;
+            cursor: pointer; /* クリック可能であることを示す */
         }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 95vw; max-width: 450px; padding: 10px; }
         .btn { height: 60px; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 10px; font-size: 1.2rem; outline: none; }
         .btn:active { background: #444; }
         #result-screen { display: none; }
+
+        /* 点滅アニメーションの修正 */
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        .blink-text { animation: blink 1.5s infinite; }
     </style>
 </head>
 <body>
@@ -45,10 +50,10 @@
 </div>
 
 <div id="game-container">
-    <div id="overlay">
+    <div id="overlay" onclick="start()">
         <div id="start-screen">
             <h1 style="color:#ff4757; font-size: 2.5rem; margin: 0; letter-spacing: 4px;">HEART BRAVE</h1>
-            <div style="text-align:left; background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin:15px 0; font-size: 0.9rem; line-height: 1.6; border-left: 4px solid #ff4757;">
+            <div style="text-align:left; background:rgba(255,255,255,0.05); padding:15px; border-radius:10px; margin:15px 0; font-size: 0.85rem; line-height: 1.6; border-left: 4px solid #ff4757;">
                 <b style="color:#ffeb3b;">【MISSION】</b><br>
                 1. 前半：全方位から飛んでくる骨を避け続けろ！<br>
                 2. 後半：足場が出現。黄色の弾を踏みつけて反撃！<br>
@@ -57,13 +62,13 @@
                 ・JUMP：長押しで高く跳ぶ<br>
                 ・空中＋下：急降下
             </div>
-            <p style="color:#00d2ff; animation: blink 1s infinite;">TAP TO START BATTLE</p>
+            <p class="blink-text" style="color:#00d2ff;">TAP TO START BATTLE</p>
         </div>
 
         <div id="result-screen">
             <h1 id="result-title" style="font-size: 2.5rem;">RESULT</h1>
             <p id="result-stats" style="font-size: 1.2rem; line-height: 2;"></p>
-            <p style="color:#00d2ff;">TAP TO RETRY</p>
+            <p class="blink-text" style="color:#00d2ff;">TAP TO RETRY</p>
         </div>
     </div>
     <canvas id="gameCanvas"></canvas>
@@ -95,7 +100,6 @@ const boss = { x: 1050, y: 250, w: 120, h: 120, targetY: 250, beamTimer: 0 };
 let bullets = [], bones = [], items = [];
 const keys = {};
 
-// 地面のみ。空中足場は後半に出現。
 const floor = {x: 0, y: 570, w: W, h: 30};
 let activePlatforms = [floor];
 
@@ -103,9 +107,8 @@ function update() {
     if(!gameActive) return;
     frame++;
 
-    // プレイヤー物理
-    if(keys['ArrowLeft'] || keys['l-btn']) player.vx = -6.5;
-    else if(keys['ArrowRight'] || keys['r-btn']) player.vx = 6.5;
+    if(keys['ArrowLeft'] || keys['l-btn']) player.vx = -7;
+    else if(keys['ArrowRight'] || keys['r-btn']) player.vx = 7;
     else player.vx *= 0.82;
 
     if((keys['ArrowUp'] || keys['j-btn']) && player.grounded) { player.vy = -13; player.grounded = false; }
@@ -122,12 +125,10 @@ function update() {
     });
     player.x = Math.max(0, Math.min(W - player.w, player.x));
 
-    // ステージ進行
     if(stage === 1) {
         bossHp -= 0.06;
         if(bossHp <= 50) { 
-            stage = 2; bossHp = 50; bones = []; // 骨をすべて消去
-            // 後半用足場出現
+            stage = 2; bossHp = 50; bones = [];
             activePlatforms.push(
                 {x: 150, y: 400, w: 200, h: 10}, 
                 {x: 500, y: 350, w: 200, h: 10},
@@ -135,44 +136,30 @@ function update() {
                 {x: 350, y: 180, w: 500, h: 10}
             );
         }
-        
-        // 前半：全方位からの骨攻撃演出
         if(frame % 45 === 0) {
             let rnd = Math.random();
-            if(rnd < 0.4) { // 下から
+            if(rnd < 0.4) {
                 bones.push({ x: Math.random()*(W-100), y: 600, w: 35, h: 220, targetY: 420, vx: 0, timer: 40 });
-            } else if(rnd < 0.7) { // 右から左へ流れる
-                bones.push({ x: W, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: -8, timer: 0 });
-            } else { // 左から右へ流れる
-                bones.push({ x: -100, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: 8, timer: 0 });
+            } else if(rnd < 0.7) {
+                bones.push({ x: W, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: -9, timer: 0 });
+            } else {
+                bones.push({ x: -100, y: 500 + (Math.random()*40), w: 80, h: 30, targetY: 530, vx: 9, timer: 0 });
             }
         }
     } else {
-        // 後半：ボス戦
         boss.y += (boss.targetY - boss.y) * 0.05;
         if(frame % 100 === 0) boss.targetY = Math.random() * 300 + 50;
         boss.beamTimer++;
         if(boss.beamTimer > 380) boss.beamTimer = 0;
-
-        if(frame % 160 === 0) {
-            bullets.push({ x: boss.x, y: boss.y + 60, vx: -5, vy: (Math.random()-0.5)*4, type: 'reflect', size: 28 });
-        }
-        if(frame % 45 === 0) {
-            bullets.push({ x: boss.x, y: boss.y + 60, vx: -10, vy: (Math.random()-0.5)*9, type: 'normal', size: 10 });
-        }
+        if(frame % 160 === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -5, vy: (Math.random()-0.5)*4, type: 'reflect', size: 30 });
+        if(frame % 45 === 0) bullets.push({ x: boss.x, y: boss.y + 60, vx: -11, vy: (Math.random()-0.5)*9, type: 'normal', size: 10 });
     }
 
-    // オブジェクト処理
     bones.forEach((b, i) => {
-        if(b.vx === 0) { // 下から突き出すタイプ
-            b.timer--;
-            if(b.timer < 0) b.y += (b.targetY - b.y) * 0.15;
-        } else { // 横から流れるタイプ
-            b.x += b.vx;
-            b.y = b.targetY;
-        }
-        if(player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) hp -= 1.8;
-        if(b.x < -200 || b.x > W + 200 || (b.vx === 0 && frame % 100 === 0 && b.y > 580)) bones.splice(i, 1);
+        if(b.vx === 0) { b.timer--; if(b.timer < 0) b.y += (b.targetY - b.y) * 0.15; }
+        else { b.x += b.vx; b.y = b.targetY; }
+        if(player.x < b.x + b.w && player.x + player.w > b.x && player.y < b.y + b.h && player.y + player.h > b.y) hp -= 2.0;
+        if(b.x < -200 || b.x > W + 200) bones.splice(i, 1);
     });
 
     bullets.forEach((b, i) => {
@@ -198,7 +185,7 @@ function update() {
 
     document.getElementById('p-hp').style.width = hp + "%";
     document.getElementById('b-hp').style.width = (bossHp * 2) + "%";
-    document.getElementById('stage-text').innerText = stage === 1 ? "STAGE 1: SURVIVE THE BONES" : "FINAL STAGE: REVENGE";
+    document.getElementById('stage-text').innerText = stage === 1 ? "STAGE 1: BONE SURVIVAL" : "FINAL STAGE: BOSS BATTLE";
     document.getElementById('boss-label').innerText = stage === 1 ? "ANALYZING..." : "ANNIHILATOR X";
 
     if(hp <= 0) showResult(false);
@@ -210,44 +197,19 @@ function update() {
 
 function draw() {
     ctx.fillStyle = "#010105"; ctx.fillRect(0, 0, W, H);
-
-    // 足場
-    ctx.fillStyle = "#111122";
-    activePlatforms.forEach(p => {
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.strokeStyle = "#333"; ctx.strokeRect(p.x, p.y, p.w, p.h);
-    });
-
-    // プレイヤー（ハート）
+    activePlatforms.forEach(p => { ctx.fillStyle = "#111122"; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.strokeStyle = "#333"; ctx.strokeRect(p.x, p.y, p.w, p.h); });
     ctx.fillStyle = "#ff4757"; ctx.shadowBlur = 15; ctx.shadowColor = "#ff4757";
     ctx.fillRect(player.x, player.y, player.w, player.h);
     ctx.shadowBlur = 0;
-
-    // ボス
     if(stage === 2) {
-        ctx.fillStyle = "#1e90ff"; ctx.shadowBlur = 20; ctx.shadowColor = "#1e90ff";
-        ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
-        if(boss.beamTimer > 250 && boss.beamTimer < 320) {
-            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-            ctx.fillRect(0, boss.y + 20, boss.x, 80);
-        }
+        ctx.fillStyle = "#1e90ff"; ctx.shadowBlur = 20; ctx.shadowColor = "#1e90ff"; ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
+        if(boss.beamTimer > 250 && boss.beamTimer < 320) { ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; ctx.fillRect(0, boss.y + 20, boss.x, 80); }
     }
-
-    // 骨
-    ctx.fillStyle = "#e0e0e0";
-    bones.forEach(b => {
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-        ctx.strokeStyle = "#fff"; ctx.strokeRect(b.x, b.y, b.w, b.h);
-    });
-
-    // 弾
+    ctx.fillStyle = "#e0e0e0"; bones.forEach(b => { ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = "#fff"; ctx.strokeRect(b.x, b.y, b.w, b.h); });
     bullets.forEach(b => {
         ctx.fillStyle = b.type === 'reflect' ? "#fff200" : (b.type === 'returned' ? "#00ffff" : "#ff4757");
-        ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
-        ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
     });
-
-    // アイテム
     ctx.shadowBlur = 15; ctx.shadowColor = "#2ed573"; ctx.fillStyle = "#2ed573"; ctx.font = "bold 35px Arial";
     items.forEach(it => ctx.fillText("✚", it.x, it.y));
     ctx.shadowBlur = 0;
@@ -259,13 +221,9 @@ function showResult(isWin) {
     startScreen.style.display = 'none';
     resultScreen.style.display = 'block';
     const timeTaken = ((Date.now() - startTime) / 1000).toFixed(2);
-    document.getElementById('result-title').innerText = isWin ? "DOMINATED" : "PURGED";
+    document.getElementById('result-title').innerText = isWin ? "MISSION COMPLETE" : "MISSION FAILED";
     document.getElementById('result-title').style.color = isWin ? "#2ecc71" : "#ff4757";
-    document.getElementById('result-stats').innerHTML = `
-        TIME: ${timeTaken}s<br>
-        HP: ${Math.max(0, Math.floor(hp))}%<br>
-        RANK: ${isWin ? (hp > 85 ? "S" : "A") : "F"}
-    `;
+    document.getElementById('result-stats').innerHTML = `TIME: ${timeTaken}s<br>HP: ${Math.max(0, Math.floor(hp))}%<br>RANK: ${isWin ? (hp > 85 ? "S" : "A") : "F"}`;
 }
 
 function start() {
@@ -278,18 +236,19 @@ function start() {
     }
 }
 
-overlay.addEventListener('pointerdown', start);
+// キーボードとボタン操作のバインド
 window.addEventListener('keydown', e => { keys[e.code] = true; start(); });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
 const bind = (id) => {
     const el = document.getElementById(id);
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[id] = true; start(); });
-    el.addEventListener('pointerup', () => keys[id] = false);
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); keys[id] = true; start(); });
+    el.addEventListener('pointerup', (e) => { e.preventDefault(); keys[id] = false; });
 };
 ['l-btn', 'j-btn', 'r-btn'].forEach(bind);
 
-@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+// 初回描画
+draw();
 </script>
 </body>
 </html>
