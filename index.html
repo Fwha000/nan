@@ -3,166 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quick Buzz Quiz Master - 30 Questions</title>
+    <title>Heart Brave - Platformer Mini Game</title>
     <style>
-        :root { --primary: #4a90e2; --secondary: #f39c12; --danger: #e74c3c; --success: #2ecc71; --dark: #2c3e50; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        #game-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; color: var(--dark); border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .category-badge { background: var(--primary); color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; margin-bottom: 10px; display: inline-block; }
-        #question-display { font-size: 1.4rem; min-height: 120px; margin-bottom: 20px; line-height: 1.6; color: #333; text-align: left; }
-        .buzz-btn { width: 140px; height: 140px; border-radius: 50%; border: none; background: var(--danger); color: white; font-size: 1.4rem; font-weight: bold; cursor: pointer; box-shadow: 0 8px 0 #c0392b; transition: all 0.1s; margin: 20px 0; outline: none; }
-        .buzz-btn:active { transform: translateY(4px); box-shadow: 0 4px 0 #c0392b; }
-        .buzz-btn:disabled { background: #bdc3c7; box-shadow: 0 4px 0 #95a5a6; cursor: not-allowed; }
-        #answer-input-area { display: none; margin-top: 20px; background: #f9f9f9; padding: 20px; border-radius: 10px; }
-        input[type="text"] { padding: 12px; font-size: 1.1rem; border: 2px solid #ddd; border-radius: 5px; width: 80%; margin-bottom: 10px; outline: none; }
-        input[type="text"]:focus { border-color: var(--primary); }
-        .btn-common { padding: 10px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        #submit-btn { background: var(--primary); color: white; }
-        #feedback { margin-top: 20px; font-size: 1.2rem; font-weight: bold; min-height: 30px; }
-        .progress-bar { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-bottom: 20px; overflow: hidden; }
-        #progress-fill { width: 0%; height: 100%; background: var(--success); transition: width 0.3s; }
+        :root {
+            --bg-color: #1a1a2e;
+            --player-color: #4a90e2;
+            --heart-color: #e74c3c;
+            --platform-color: #2ecc71;
+            --enemy-color: #f39c12;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-info {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #canvas-container {
+            position: relative;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 4px solid #333;
+            border-radius: 8px;
+        }
+
+        canvas {
+            background: #0f0f1a;
+            display: block;
+        }
+
+        .controls-guide {
+            margin-top: 15px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .mobile-controls {
+            display: none;
+            margin-top: 20px;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls { display: flex; }
+        }
+
+        .btn {
+            padding: 15px 25px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    <div class="stats">
-        <div>Score: <span id="score">0</span></div>
-        <div><span id="current-q-num">1</span> / <span id="total-q-num">30</span></div>
-    </div>
-    <div class="progress-bar"><div id="progress-fill"></div></div>
-    
-    <div id="category" class="category-badge">準備完了</div>
-    <div id="question-display">真ん中のボタンを押すとクイズが始まります！</div>
+<div id="game-info">
+    <h1>HEART BRAVE</h1>
+    <p>Score: <span id="score">0</span> | HP: <span id="hp">3</span></p>
+</div>
 
-    <button id="buzz-button" class="buzz-btn">START</button>
+<div id="canvas-container">
+    <canvas id="gameCanvas"></canvas>
+</div>
 
-    <div id="answer-input-area">
-        <input type="text" id="answer-field" placeholder="答えを入力..." autocomplete="off">
-        <br>
-        <button id="submit-btn" class="btn-common">回答を送信</button>
-    </div>
+<div class="controls-guide">
+    移動: ← → / ジャンプ: Space / 攻撃(ハート): Z
+</div>
 
-    <div id="feedback"></div>
+<div class="mobile-controls">
+    <button class="btn" id="btn-left">←</button>
+    <button class="btn" id="btn-jump">JUMP</button>
+    <button class="btn" id="btn-right">→</button>
+    <button class="btn" id="btn-shoot" style="background: var(--heart-color);">HEART</button>
 </div>
 
 <script>
-// 30問のクイズデータ
-const quizData = [
-    { c: "地理", q: "日本で一番広い都道府県はどこ？", a: "北海道" },
-    { c: "地理", q: "世界で一番長い川は何川？", a: "ナイル川" },
-    { c: "科学", q: "水が沸騰する温度は摂氏何度？", a: "100度" },
-    { c: "歴史", q: "1192年、鎌倉幕府を開いたのは誰？", a: "源頼朝" },
-    { c: "文学", q: "「走れメロス」の著者は誰？", a: "太宰治" },
-    { c: "科学", q: "地球の衛星の名前は何？", a: "月" },
-    { c: "一般", q: "トランプの合計枚数はジョーカーを除いて何枚？", a: "52枚" },
-    { c: "歴史", q: "織田信長が倒れた事件の名前は？", a: "本能寺の変" },
-    { c: "スポーツ", q: "サッカーの1チームの人数は何人？", a: "11人" },
-    { c: "科学", q: "植物が光を受けて栄養を作る仕組みは？", a: "光合成" },
-    { c: "地理", q: "世界一面積が広い国はどこ？", a: "ロシア" },
-    { c: "音楽", q: "「運命」を作曲したドイツの音楽家は？", a: "ベートーヴェン" },
-    { c: "一般", q: "一円玉の重さは何グラム？", a: "1g" },
-    { c: "科学", q: "人体で一番大きな臓器は何？", a: "肝臓" },
-    { c: "歴史", q: "フランス革命で処刑された王妃は？", a: "マリー・アントワネット" },
-    { c: "地理", q: "アメリカ合衆国の首都はどこ？", a: "ワシントンDC" },
-    { c: "一般", q: "干支（十二支）の最初の動物は何？", a: "子" },
-    { c: "文学", q: "日本最古の歌集の名前は？", a: "万葉集" },
-    { c: "科学", q: "光の速さは秒速約何万キロ？", a: "30万キロ" },
-    { c: "一般", q: "将棋の駒で、唯一成ることができないのは？", a: "王将" },
-    { c: "歴史", q: "ピラミッドで有名な古代文明は？", a: "エジプト文明" },
-    { c: "地理", q: "日本で一番深い湖はどこ？", a: "田沢湖" },
-    { c: "音楽", q: "ピアノの鍵盤の数は全部でいくつ？", a: "88個" },
-    { c: "科学", q: "昆虫の足の数は全部で何本？", a: "6本" },
-    { c: "一般", q: "オリンピックの五輪マーク、青・黄・黒・緑とあと一つは何色？", a: "赤" },
-    { c: "文学", q: "夏目漱石の肖像がかつて描かれていた紙幣は？", a: "千円札" },
-    { c: "地理", q: "世界で一番人口が多い国は？（2023年以降）", a: "インド" },
-    { c: "歴史", q: "江戸幕府を終わらせた出来事を何という？", a: "大政奉還" },
-    { c: "スポーツ", q: "テニスで得点が「0」のことを何と呼ぶ？", a: "ラブ" },
-    { c: "科学", q: "ダイヤモンドの正体である元素は何？", a: "炭素" }
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const hpEl = document.getElementById('hp');
+
+// ゲーム設定
+canvas.width = 800;
+canvas.height = 400;
+
+const config = {
+    gravity: 0.45,        // 重力
+    jumpPower: -10.5,     // 絶妙に届くけど少し弱いジャンプ
+    moveSpeed: 5,
+    heartSpeed: 7
+};
+
+let score = 0;
+let hp = 3;
+let gameActive = true;
+
+// 状態管理
+const keys = { right: false, left: false, space: false, z: false };
+
+// プレイヤー
+const player = {
+    x: 50,
+    y: 300,
+    w: 30,
+    h: 30,
+    vx: 0,
+    vy: 0,
+    grounded: false
+};
+
+// オブジェクト配列
+let platforms = [
+    {x: 0, y: 370, w: 800, h: 30},   // 床
+    {x: 200, y: 280, w: 120, h: 15}, // 足場1
+    {x: 400, y: 200, w: 120, h: 15}, // 足場2
+    {x: 600, y: 280, w: 120, h: 15}  // 足場3
 ];
 
-let currentIdx = 0;
-let score = 0;
-let displayInterval;
-let isStarted = false;
+let hearts = [];
+let enemies = [];
 
-const qDisplay = document.getElementById('question-display');
-const buzzBtn = document.getElementById('buzz-button');
-const inputArea = document.getElementById('answer-input-area');
-const answerField = document.getElementById('answer-field');
-const scoreDisplay = document.getElementById('score');
-const currentQNum = document.getElementById('current-q-num');
-const totalQNum = document.getElementById('total-q-num');
-const categoryBadge = document.getElementById('category');
-const feedback = document.getElementById('feedback');
-const progressFill = document.getElementById('progress-fill');
-
-totalQNum.innerText = quizData.length;
-
-function nextQuestion() {
-    if(currentIdx >= quizData.length) {
-        qDisplay.innerText = "全問終了！お疲れ様でした。";
-        categoryBadge.innerText = "Finish";
-        buzzBtn.style.display = 'none';
-        return;
-    }
-    
-    isStarted = true;
-    buzzBtn.innerText = "BUZZ!";
-    inputArea.style.display = 'none';
-    buzzBtn.disabled = false;
-    feedback.innerText = "";
-    answerField.value = "";
-    
-    currentQNum.innerText = currentIdx + 1;
-    categoryBadge.innerText = quizData[currentIdx].c;
-    progressFill.style.width = `${(currentIdx / quizData.length) * 100}%`;
-    
-    let fullText = quizData[currentIdx].q;
-    let charIdx = 0;
-    qDisplay.innerText = "";
-    
-    clearInterval(displayInterval);
-    displayInterval = setInterval(() => {
-        qDisplay.innerText += fullText[charIdx];
-        charIdx++;
-        if(charIdx >= fullText.length) clearInterval(displayInterval);
-    }, 100);
-}
-
-buzzBtn.addEventListener('click', () => {
-    if(!isStarted) {
-        nextQuestion();
-        return;
-    }
-    clearInterval(displayInterval);
-    buzzBtn.disabled = true;
-    inputArea.style.display = 'block';
-    answerField.focus();
-});
-
-function checkAnswer() {
-    const userAns = answerField.value.trim();
-    const correctAns = quizData[currentIdx].a;
-
-    if(userAns === correctAns) {
-        feedback.innerText = "正解！ ⭕";
-        feedback.style.color = "var(--success)";
-        score += 10;
-    } else {
-        feedback.innerText = `❌ 正解は: ${correctAns}`;
-        feedback.style.color = "var(--danger)";
-    }
-
-    scoreDisplay.innerText = score;
-    currentIdx++;
-    setTimeout(nextQuestion, 1500);
-}
-
-document.getElementById('submit-btn').addEventListener('click', checkAnswer);
-answerField.addEventListener('keypress', (e) => { if(e.key === 'Enter') checkAnswer(); });
-
-</script>
-</body>
-</html>
+// 敵の生成
+function spawnEnemy() {
+    if(!gameActive) return;
+    enemies.push({
