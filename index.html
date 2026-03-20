@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS: BATTLE (PHASE SEPARATED)</title>
+    <title>SANS: BATTLE (8-WAY BONES)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
@@ -32,8 +32,8 @@
 
 <div id="game-box">
     <div id="start-screen" class="overlay">
-        <h1>* 地面か、横か。</h1>
-        <p>赤ソウル時は攻撃が混ざりません</p>
+        <h1>* 四方八方、どこから来る？</h1>
+        <p>赤ソウル時の飛び骨が全方向から飛来</p>
         <button class="btn" onclick="init()">はじめる</button>
     </div>
     <div id="death-screen" class="overlay" style="display: none;">
@@ -97,19 +97,50 @@ function spawnFlyerWave() {
     let count = 0;
     const interval = setInterval(() => {
         if (!active || p.mode !== 'red') { clearInterval(interval); return; }
-        let side = Math.random() > 0.5;
+        
+        let startX, startY, targetX, targetY;
+        let spawnSide = Math.floor(Math.random() * 4); // 0:上, 1:下, 2:左, 3:右
+
+        targetX = p.x + p.w / 2;
+        targetY = p.y + p.h / 2;
+
+        switch(spawnSide) {
+            case 0: // 上から
+                startX = Math.random() * 600;
+                startY = -30;
+                break;
+            case 1: // 下から
+                startX = Math.random() * 600;
+                startY = 430;
+                break;
+            case 2: // 左から
+                startX = -30;
+                startY = Math.random() * 400;
+                break;
+            case 3: // 右から
+                startX = 630;
+                startY = Math.random() * 400;
+                break;
+        }
+
+        let dx = targetX - startX;
+        let dy = targetY - startY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        let speed = 5 + Math.random() * 2; // スピード調整
+
         flyers.push({
-            x: side ? -30 : 630,
-            y: 280 + Math.random() * 80, // ジャンプで避けられる高さに限定
-            vx: side ? 6 : -6,
-            w: 35, h: 12
+            x: startX, y: startY,
+            vx: (dx / dist) * speed,
+            vy: (dy / dist) * speed,
+            w: 35, h: 12,
+            rot: Math.atan2(dy, dx) // 骨の向きもプレイヤーに合わせる
         });
         count++;
-        if (count >= 5) { // 5回飛ばしたら終了
+        if (count >= 7) { // 7回飛ばしたら終了
             clearInterval(interval);
             setTimeout(() => { currentAttack = "none"; cooldown = 40; }, 800);
         }
-    }, 600);
+    }, 450); // 出現間隔を少し短縮
 }
 
 function update() {
@@ -149,23 +180,22 @@ function update() {
     p.x = Math.max(0, Math.min(600 - p.w, p.x));
     p.y = Math.max(0, Math.min(400 - p.h, p.y));
 
-    // 攻撃パターン管理
-    if (cooldown <= 0 && currentAttack === "none") {
-        if (p.mode === 'red') {
-            if (Math.random() > 0.5) {
-                // 地面の骨パターン
-                currentAttack = "floor";
-                let safe = Math.floor(Math.random() * 5);
-                for(let i=0; i<6; i++) { if(i!==safe && i!==safe+1) warns.push({x:i*100, w:100, t:45}); }
-            } else {
-                // 飛び骨パターン
-                spawnFlyerWave();
-            }
+    // 攻撃パターン管理 (赤ソウル)
+    if (cooldown <= 0 && currentAttack === "none" && p.mode === 'red') {
+        if (Math.random() > 0.5) {
+            // 地面の骨パターン
+            currentAttack = "floor";
+            let safe = Math.floor(Math.random() * 5);
+            for(let i=0; i<6; i++) { if(i!==safe && i!==safe+1) warns.push({x:i*100, w:100, t:45}); }
+        } else {
+            // 八方飛び骨パターン
+            spawnFlyerWave();
         }
     }
 
+    // 攻撃パターン管理 (青ソウル)
     if (p.mode === 'blue' && cooldown <= 0) {
-        if (spiralCount < 15) {
+        if (spiralCount < 18) { // ビームの数を少し増やす
             if (frame % 10 === 0) {
                 spiralAngle += 0.40;
                 spawnBlaster(); spiralCount++;
@@ -187,9 +217,13 @@ function update() {
         }
     });
     flyers.forEach((f, i) => {
-        f.x += f.vx;
-        if (Math.abs(p.x+8 - (f.x+17)) < 15 && Math.abs(p.y+8 - (f.y+6)) < 10) { hp -= 2.0; shake = 5; }
-        if (f.x < -100 || f.x > 700) flyers.splice(i, 1);
+        f.x += f.vx; f.y += f.vy;
+        // プレイヤーの中心と骨の中心で判定
+        if (Math.abs(p.x + p.w / 2 - (f.x + f.w / 2)) < (p.w/2 + f.w/2 - 5) && 
+            Math.abs(p.y + p.h / 2 - (f.y + f.h / 2)) < (p.h/2 + f.h/2 - 5)) { 
+            hp -= 2.0; shake = 5; 
+        }
+        if (f.x < -100 || f.x > 700 || f.y < -100 || f.y > 500) flyers.splice(i, 1);
     });
     blasters.forEach((b, i) => {
         b.timer--;
@@ -221,8 +255,12 @@ function draw() {
         ctx.fillRect(b.x, 400-offset, b.w, offset);
     });
     flyers.forEach(f => {
-        ctx.fillStyle = '#fff'; ctx.fillRect(f.x, f.y, f.w, f.h);
-        ctx.fillStyle = '#f00'; ctx.fillRect(f.x + (f.vx > 0 ? f.w-8 : 0), f.y, 8, f.h);
+        ctx.save();
+        ctx.translate(f.x + f.w/2, f.y + f.h/2);
+        ctx.rotate(f.rot);
+        ctx.fillStyle = '#fff'; ctx.fillRect(-f.w/2, -f.h/2, f.w, f.h);
+        ctx.fillStyle = '#f00'; ctx.fillRect(f.w/2 - 8, -f.h/2, 8, f.h); // 先端を赤く
+        ctx.restore();
     });
     blasters.forEach(b => {
         ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot);
@@ -266,3 +304,5 @@ window.onkeyup = e => {
 </script>
 </body>
 </html>
+
+http://googleusercontent.com/immersive_entry_chip/0
