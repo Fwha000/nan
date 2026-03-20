@@ -3,13 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Heart Brave - Grand Boss Battle</title>
+    <title>Heart Brave - Undertale Intro & Grand Boss Battle</title>
     <style>
         body {
             margin: 0; padding: 0; background: #010105; color: white;
-            font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: none;
+            font-family: 'PixelMplus10', 'Segoe UI', sans-serif; /* ピクセルフォント感を出す */
+            overflow: hidden; touch-action: none;
             display: flex; flex-direction: column; align-items: center;
         }
+        @font-face {
+            font-family: 'PixelMplus10';
+            src: url('https://fonts.cdnfonts.com/s/30355/PixelMplus10-Regular.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         #hud {
             width: 100%; max-width: 700px; padding: 10px;
             display: flex; flex-direction: column; gap: 5px; z-index: 10;
@@ -32,6 +40,24 @@
             background: rgba(0,0,0,0.85); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100; cursor: pointer; text-align: center;
         }
+        #intro-box {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 500px; height: 150px;
+            background: rgba(0,0,0,0.8); border: 3px solid white; border-radius: 10px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 10px; box-sizing: border-box; font-size: 1.2rem;
+            opacity: 0; transition: opacity 0.5s; pointer-events: none;
+        }
+        #intro-text { margin-bottom: 10px; }
+        #intro-choices { display: flex; gap: 20px; }
+        .choice-btn {
+            background: #333; color: white; border: 2px solid white; padding: 8px 20px;
+            border-radius: 5px; cursor: pointer; font-size: 1rem;
+        }
+        .choice-btn:hover { background: #555; }
+        .choice-btn.selected { background: #007bff; border-color: #007bff; }
+
+
         .controls {
             display: grid; grid-template-columns: repeat(3, 1fr);
             gap: 15px; padding: 10px; width: 95vw; max-width: 450px;
@@ -58,10 +84,28 @@
 <div id="game-container">
     <div id="overlay">
         <h1 id="title" style="color:#ff4757; margin:0; font-size: 2.5rem;">HEART BRAVE</h1>
-        <p id="msg" style="margin: 15px 0; line-height: 1.6;">移動: ← → / ジャンプ: ↑<br>形態が進むほど攻撃は激化する。<br><span style="color:#2ecc71;">リペアキット（✚）を逃すな！</span></p>
-        <p style="font-size: 1rem; color: #aaa;">画面をタップして戦闘開始</p>
+        <div style="margin: 15px 0; line-height: 1.6; max-width: 700px;">
+            <p style="font-size: 1.2rem; font-weight: bold; color: #ffeb3b;">≪ ルール説明 ≫</p>
+            <ul style="list-style-type: none; padding: 0; text-align: left; font-size: 1rem;">
+                <li><span style="color:#4a90e2;">プレイヤー</span>を操作し、敵の攻撃を避けよう。</li>
+                <li><span style="color:#ffeb3b;">黄色の弾</span>に空中で触れると、ボスに反射してダメージを与えるぞ！</li>
+                <li>ボスは<span style="color:#f1c40f;">形態変化</span>する。攻撃が激しくなるので注意！</li>
+                <li><span style="color:#a29bfe;">強力なビーム</span>は、ボスの上下に逃げて回避だ。</li>
+                <li><span style="color:#2ecc71;">緑の✚マーク</span>は回復アイテム。ピンチの時に役立つぞ。</li>
+                <li>移動: ← → / ジャンプ: ↑（または下のボタン）</li>
+            </ul>
+        </div>
+        <p style="font-size: 1rem; color: #aaa;">画面をタップしてゲームを開始</p>
     </div>
     <canvas id="gameCanvas"></canvas>
+
+    <div id="intro-box">
+        <p id="intro-text">なんだか、戦いが始まりそうな予感がする...</p>
+        <div id="intro-choices">
+            <div class="choice-btn" id="choice-fight">たたかう</div>
+            <div class="choice-btn" id="choice-flee">にがす</div>
+        </div>
+    </div>
 </div>
 
 <div class="controls">
@@ -78,11 +122,14 @@ const bBar = document.getElementById('boss-hp-bar');
 const pLabel = document.getElementById('phase-label');
 const bStatus = document.getElementById('boss-status');
 const overlay = document.getElementById('overlay');
+const introBox = document.getElementById('intro-box');
+const introText = document.getElementById('intro-text');
+const choiceFight = document.getElementById('choice-fight');
+const choiceFlee = document.getElementById('choice-flee');
 
-// フィールド最大化
 canvas.width = 800; canvas.height = 600;
 
-let gameActive = false, hp = 100, bossHp = 100, frame = 0, shake = 0, phase = 1;
+let gameActive = false, hp = 100, bossHp = 100, frame = 0, shake = 0, phase = 0; // phase 0: intro, 1-3: boss battle
 const player = { x: 100, y: 500, w: 35, h: 35, vx: 0, vy: 0, grounded: false };
 const boss = { x: 900, y: 250, w: 100, h: 100, targetY: 250, active: false, beamTimer: 0, color: "#ff4757" };
 
@@ -96,22 +143,58 @@ const platforms = [
 ];
 
 let bullets = [];
+let sideBeams = []; // サイドビームの情報を格納
 let items = [];
 let stars = Array.from({length: 70}, () => ({x: Math.random()*800, y: Math.random()*600, s: Math.random()*2.5 + 0.5}));
 const keys = {};
 
-function spawnBullet(x, y, vx, vy, type, size = 8) {
-    bullets.push({ x, y, vx, vy, type, size: type === 'reflect' ? 14 : size });
+let currentChoice = 0; // 0: たたかう, 1: にがす
+
+function spawnBullet(x, y, vx, vy, type, size = 8, color = null) {
+    bullets.push({ x, y, vx, vy, type, size: type === 'reflect' ? 14 : size, color: color });
 }
 
 function spawnItem() {
     if(!gameActive) return;
     items.push({ x: Math.random() * 600 + 100, y: -30, vy: 1.5, w: 30, h: 30 });
-    setTimeout(spawnItem, 10000); // 10秒ごとに回復
+    setTimeout(spawnItem, 12000); // 12秒ごとに回復
+}
+
+function updateIntroChoices() {
+    choiceFight.classList.remove('selected');
+    choiceFlee.classList.remove('selected');
+    if (currentChoice === 0) {
+        choiceFight.classList.add('selected');
+    } else {
+        choiceFlee.classList.add('selected');
+    }
+}
+
+function startBossBattle() {
+    introBox.style.opacity = 0;
+    setTimeout(() => { // アニメーション後に非表示
+        introBox.style.pointerEvents = 'none';
+        introBox.style.display = 'none';
+        phase = 1; // フェーズをボスバトルへ
+        gameActive = true;
+        spawnItem();
+        update();
+    }, 500);
 }
 
 function update() {
-    if(!gameActive) return;
+    if(!gameActive) { // Introパート中のプレイヤー制御
+        if (phase === 0) {
+             if (keys['ArrowLeft'] && !keys.prevLeft) { currentChoice = 0; updateIntroChoices(); }
+             if (keys['ArrowRight'] && !keys.prevRight) { currentChoice = 1; updateIntroChoices(); }
+             if (keys['Enter'] || keys['Space'] && !keys.prevEnter) { startBossBattle(); }
+             keys.prevLeft = keys['ArrowLeft'];
+             keys.prevRight = keys['ArrowRight'];
+             keys.prevEnter = keys['Enter'] || keys['Space'];
+        }
+        return;
+    }
+
     frame++;
     if(shake > 0) shake--;
 
@@ -119,11 +202,11 @@ function update() {
 
     // フェーズ遷移
     if(bossHp > 70) { 
-        phase = 1; boss.color = "#ff4757"; pLabel.innerText = "PHASE 1";
+        phase = 1; boss.color = "#ff4757"; pLabel.innerText = "PHASE 1"; bStatus.innerText = "BOSS: AWAKENING";
     } else if(bossHp > 35) { 
-        phase = 2; boss.color = "#a29bfe"; pLabel.innerText = "PHASE 2: BIT DEPLOYED";
+        phase = 2; boss.color = "#a29bfe"; pLabel.innerText = "PHASE 2: BIT DEPLOYED"; bStatus.innerText = "BOSS: ENRAGED";
     } else { 
-        phase = 3; boss.color = "#f1c40f"; pLabel.innerText = "FINAL PHASE: OVERDRIVE";
+        phase = 3; boss.color = "#f1c40f"; pLabel.innerText = "FINAL PHASE: OVERDRIVE"; bStatus.innerText = "BOSS: FULL POWER!!";
     }
 
     // プレイヤー制御
@@ -141,40 +224,69 @@ function update() {
     player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
 
     // ボス挙動
-    if(frame > 60) boss.active = true;
     if(boss.active && bossHp > 0) {
         boss.x += (660 - boss.x) * 0.04;
         let moveIntensity = phase === 3 ? 0.08 : 0.04;
         boss.y += (boss.targetY - boss.y) * moveIntensity;
         if(frame % 90 === 0) boss.targetY = Math.random() * 400 + 50;
 
-        // ビーム頻度を大幅に減少 (300 -> 500フレーム周期)
+        // ビーム頻度をさらに減少 (500 -> 700フレーム周期)
         boss.beamTimer += (phase === 3 ? 1.5 : 1.0);
-        if(boss.beamTimer > 500) boss.beamTimer = 0;
+        if(boss.beamTimer > 700) boss.beamTimer = 0;
 
         // 攻撃ロジック
         if(boss.beamTimer < 200) {
             // 反射弾
-            let reflectInterval = phase === 3 ? 80 : 120;
+            let reflectInterval = phase === 3 ? 60 : 100;
             if(frame % reflectInterval === 0) {
                 let count = phase === 1 ? 6 : (phase === 2 ? 8 : 12);
                 for(let i=0; i<count; i++) {
                     const a = i * Math.PI * 2 / count;
-                    spawnBullet(boss.x + 50, boss.y + 50, Math.cos(a)*4, Math.sin(a)*4, 'reflect');
+                    spawnBullet(boss.x + 50, boss.y + 50, Math.cos(a)*4.5, Math.sin(a)*4.5, 'reflect');
                 }
             }
             // 通常弾
-            if(frame % (phase === 3 ? 25 : 40) === 0) {
+            if(frame % (phase === 3 ? 20 : 35) === 0) {
                 spawnBullet(boss.x, boss.y + 50, -9, (Math.random()-0.5)*8, 'normal');
+            }
+            // 最終フェーズ限定: ランダム追尾弾
+            if (phase === 3 && frame % 15 === 0) {
+                const angleToPlayer = Math.atan2(player.y - boss.y, player.x - boss.x);
+                spawnBullet(boss.x + 50, boss.y + 50, Math.cos(angleToPlayer) * 5, Math.sin(angleToPlayer) * 5, 'normal', 10, '#f1c40f');
             }
         }
 
-        // ビーム判定 (継続ダメージをさらに微量に)
-        if(boss.beamTimer > 250 && boss.beamTimer < 320) {
+        // ボスビーム判定
+        if(boss.beamTimer > 250 && boss.beamTimer < 350) { // ビーム持続時間延長
             if(player.y + player.h > boss.y + 15 && player.y < boss.y + 85 && player.x < boss.x) {
                 hp -= 0.5; pBar.style.width = Math.max(0, hp) + "%"; shake = 4;
                 if(hp <= 0) location.reload();
             }
+        }
+
+        // サイドビーム (Final Phase限定)
+        if (phase === 3 && boss.beamTimer > 400 && boss.beamTimer < 550) { // サイドビームのタイミング
+            if (frame % 30 === 0) { // 頻度を調整
+                // 左からのビーム
+                const leftBeamY = Math.random() * (canvas.height - 100) + 50;
+                sideBeams.push({x: 0, y: leftBeamY, w: 20, h: 80, activeTime: frame + 60, dir: 'left'});
+                // 右からのビーム
+                const rightBeamY = Math.random() * (canvas.height - 100) + 50;
+                sideBeams.push({x: canvas.width - 20, y: rightBeamY, w: 20, h: 80, activeTime: frame + 60, dir: 'right'});
+            }
+            // サイドビーム当たり判定
+            sideBeams.forEach(sb => {
+                if (frame > sb.activeTime) {
+                    if (player.x < sb.x + sb.w && player.x + player.w > sb.x &&
+                        player.y < sb.y + sb.h && player.y + player.h > sb.y) {
+                        hp -= 0.7; pBar.style.width = Math.max(0, hp) + "%"; shake = 3;
+                        if(hp <= 0) location.reload();
+                    }
+                }
+            });
+            sideBeams = sideBeams.filter(sb => frame < sb.activeTime + 100); // 一定時間で消滅
+        } else {
+            sideBeams = []; // ビームタイム以外はリセット
         }
     }
 
@@ -237,7 +349,7 @@ function draw() {
         ctx.fillStyle = "white"; ctx.fillRect(it.x + 12, it.y + 6, 6, 18); ctx.fillRect(it.x + 6, it.y + 12, 18, 6);
     });
 
-    // プレイヤー
+    // プレイヤー (イントロ中も表示)
     ctx.fillStyle = "#4a90e2"; ctx.shadowBlur = 15; ctx.shadowColor = "#4a90e2";
     ctx.fillRect(player.x, player.y, player.w, player.h); ctx.shadowBlur = 0;
 
@@ -245,16 +357,20 @@ function draw() {
     if(boss.active && bossHp > 0) {
         // ビーム予兆
         if(boss.beamTimer > 200 && boss.beamTimer <= 250) {
-            ctx.strokeStyle = boss.color; ctx.lineWidth = 2;
-            ctx.setLineDash([10, 5]); ctx.strokeRect(0, boss.y + 20, boss.x, 60); ctx.setLineDash([]);
+            ctx.strokeStyle = boss.color; ctx.lineWidth = 3;
+            ctx.setLineDash([15, 8]); ctx.strokeRect(0, boss.y + 20, boss.x, 60); ctx.setLineDash([]);
+            ctx.shadowBlur = 20; ctx.shadowColor = boss.color;
+            ctx.fillStyle = boss.color; ctx.globalAlpha = 0.1 + (boss.beamTimer - 200) * 0.01;
+            ctx.fillRect(0, boss.y + 20, boss.x, 60); ctx.globalAlpha = 1.0;
+            ctx.shadowBlur = 0;
         }
-        // ビーム発射
-        if(boss.beamTimer > 250 && boss.beamTimer < 320) {
+        // メインビーム発射
+        if(boss.beamTimer > 250 && boss.beamTimer < 350) {
             let g = ctx.createLinearGradient(0, boss.y, 0, boss.y + 100);
             g.addColorStop(0, "transparent"); g.addColorStop(0.5, "white"); g.addColorStop(1, "transparent");
-            ctx.fillStyle = boss.color; ctx.globalAlpha = 0.4; ctx.fillRect(0, boss.y + 10, boss.x, 80);
-            ctx.fillStyle = g; ctx.globalAlpha = 0.8; ctx.fillRect(0, boss.y + 30, boss.x, 40);
-            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = boss.color; ctx.globalAlpha = 0.5; ctx.fillRect(0, boss.y + 10, boss.x, 80);
+            ctx.fillStyle = g; ctx.globalAlpha = 0.9; ctx.fillRect(0, boss.y + 30, boss.x, 40);
+            ctx.globalAlpha = 1.0; shake = 10; // 発射時により強くシェイク
         }
 
         // 第2形態以降のビット演出
@@ -266,19 +382,53 @@ function draw() {
             }
         }
 
+        // サイドビーム描画 (Final Phase)
+        sideBeams.forEach(sb => {
+            if (frame > sb.activeTime) {
+                ctx.fillStyle = "#f1c40f"; // 最終形態の色に合わせる
+                ctx.globalAlpha = 0.7;
+                ctx.fillRect(sb.x, sb.y, sb.w, sb.h);
+                ctx.globalAlpha = 1.0;
+            } else { // 予兆
+                ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]); ctx.strokeRect(sb.x, sb.y, sb.w, sb.h); ctx.setLineDash([]);
+            }
+        });
+
+
+        // ボス本体
         ctx.fillStyle = boss.color; ctx.shadowBlur = 20; ctx.shadowColor = boss.color;
+        // 点滅エフェクト
+        if (boss.beamTimer > 200 && boss.beamTimer <= 250 && frame % 10 < 5) {
+             ctx.fillStyle = "white"; // ビームチャージ中に白く点滅
+        }
+        if (phase === 3 && frame % 8 < 4) { // 最終形態で常時少し点滅
+            ctx.fillStyle = "white";
+        }
+
         ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
         ctx.fillStyle = "white"; ctx.fillRect(boss.x + 35, boss.y + 35, 30, 30);
         ctx.shadowBlur = 0;
     }
 
+    // 弾丸描画
     bullets.forEach(b => {
-        ctx.fillStyle = b.type === 'reflect' ? "#ffeb3b" : (b.type === 'returned' ? "#00d2ff" : "#ff4757");
+        ctx.fillStyle = b.color || (b.type === 'reflect' ? "#ffeb3b" : (b.type === 'returned' ? "#00d2ff" : "#ff4757"));
         if(b.type === 'reflect') { ctx.shadowBlur = 10; ctx.shadowColor = "#ffeb3b"; }
+        if(b.type === 'returned') { ctx.shadowBlur = 10; ctx.shadowColor = "#00d2ff"; }
+        if(b.type === 'normal' && b.color === '#f1c40f') { ctx.shadowBlur = 10; ctx.shadowColor = "#f1c40f"; }
         ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
         ctx.shadowBlur = 0;
     });
     ctx.restore();
+    
+    // イントロパートの描画更新は、updateでコントロール
+    if (!gameActive && phase === 0) { // イントロ中はプレイヤーハートのみ描画
+        ctx.fillStyle = "#ff4757";
+        ctx.shadowBlur = 10; ctx.shadowColor = "#ff4757";
+        ctx.fillRect(player.x, player.y + 40, 30, 30); // プレイヤーを少し下げる
+        ctx.shadowBlur = 0;
+    }
 }
 
 function victory() {
@@ -289,22 +439,51 @@ function victory() {
     overlay.style.display = 'flex';
 }
 
-const start = () => { if(!gameActive && bossHp > 0) { overlay.style.display='none'; gameActive=true; spawnItem(); update(); } else if(!gameActive) location.reload(); }
+// ゲーム開始処理
+const start = () => { 
+    if(!gameActive && phase === 0) { // オーバーレイ表示時のみ
+        overlay.style.display='none'; 
+        introBox.style.display = 'flex'; // Undertale introを表示
+        introBox.style.pointerEvents = 'auto'; // クリック可能に
+        setTimeout(() => introBox.style.opacity = 1, 100); // フェードイン
+        
+        // イントロ中のプレイヤー位置調整 (仮)
+        player.x = canvas.width / 2 - player.w / 2;
+        player.y = canvas.height - 150; // 画面下部に配置
+        
+        updateIntroChoices(); // 選択肢初期化
+        // イントロパートの間はゲームループを回さない
+        // ボスバトル開始時に update() を呼び出す
+    } else if(!gameActive) { // ゲームオーバーからのリスタート
+        location.reload();
+    }
+}
 overlay.addEventListener('pointerdown', start);
+
+// イントロ選択肢クリックイベント
+choiceFight.addEventListener('pointerdown', startBossBattle);
+choiceFlee.addEventListener('pointerdown', startBossBattle);
+
+// キーボードイベント
 window.addEventListener('keydown', e => { 
     keys[e.code] = true; 
-    if(e.code === 'ArrowUp' && player.grounded) player.vy = -14.5; 
-    if(!gameActive) start(); 
+    if (gameActive && e.code === 'ArrowUp' && player.grounded) player.vy = -14.5; 
+    if(!gameActive && phase === 0 && (e.code === 'Enter' || e.code === 'Space')) {
+        startBossBattle(); // イントロ選択時
+    }
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
+// モバイルボタンイベント
 const bind = (id, k) => {
     const el = document.getElementById(id);
-    el.addEventListener('pointerdown', e => { e.preventDefault(); if(k) keys[k] = true; else if(player.grounded) player.vy = -14.5; });
+    el.addEventListener('pointerdown', e => { e.preventDefault(); if(k) keys[k] = true; else if(gameActive && player.grounded) player.vy = -14.5; });
     el.addEventListener('pointerup', e => { if(k) keys[k] = false; });
     el.addEventListener('pointerleave', e => { if(k) keys[k] = false; });
 };
 bind('l-btn', 'left_btn'); bind('r-btn', 'right_btn'); bind('j-btn', null);
+
+// 初期描画
 draw();
 </script>
 </body>
