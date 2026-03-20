@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SANS: THE FINAL ATTACK</title>
+    <title>SANS: ZERO GRAVITY - JUDGEMENT</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
         body { margin: 0; background: #000; color: #fff; font-family: 'DotGothic16', sans-serif; overflow: hidden; touch-action: none; display: flex; flex-direction: column; align-items: center; }
@@ -12,42 +12,43 @@
         canvas { width: 100%; height: 100%; display: block; }
         #ui { width: 600px; padding: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
         #hp-bar-bg { width: 150px; height: 20px; background: #400; border: 2px solid #fff; }
-        #hp-bar-fill { width: 100%; height: 100%; background: #ff0; }
-        #dialog-box { width: 580px; height: 70px; border: 4px solid #fff; margin-top: 5px; padding: 8px; font-size: 20px; background: #000; box-sizing: border-box; overflow: hidden;}
-        .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; }
-        .btn { padding: 8px 25px; font-size: 18px; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; font-family: inherit; margin-top: 15px; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; width: 600px; }
-        .btn-ctrl { height: 55px; border: 2px solid #fff; background: #111; color: #fff; font-size: 18px; font-family: inherit; }
+        #hp-bar-fill { width: 100%; height: 100%; background: #ff0; transition: width 0.1s; }
+        #dialog-box { width: 580px; height: 70px; border: 4px solid #fff; margin-top: 5px; padding: 8px; font-size: 20px; background: #000; box-sizing: border-box; }
+        .overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        .btn { padding: 10px 30px; font-size: 20px; border: 2px solid #fff; background: #000; color: #fff; cursor: pointer; font-family: inherit; margin-top: 15px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; width: 600px; }
+        .btn-ctrl { height: 60px; border: 2px solid #fff; background: #111; color: #fff; font-family: inherit; font-size: 18px; touch-action: none; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div id="turn-info">PHASE: 1</div>
+    <div id="phase-display">PHASE: 1</div>
     <div style="display:flex; align-items:center;">
         HP <div id="hp-bar-bg"><div id="hp-bar-fill"></div></div>
-        <span id="hp-num">92</span> / 92
+        <span id="hp-num">92</span>/92
     </div>
 </div>
 
 <div id="game-container">
     <div id="game-box">
         <div id="start-screen" class="overlay">
-            <h1 style="font-size: 32px;">* 決着をつけようぜ。</h1>
-            <button class="btn" onclick="init()">地獄へ行く</button>
+            <h1 style="font-size: 30px;">* 無重力なら避けられるか？</h1>
+            <button class="btn" onclick="init()">地獄の始まり</button>
         </div>
         <div id="death-screen" class="overlay" style="display: none;">
-            <h1 style="color: #f00;">* 諦めるな。</h1>
-            <button class="btn" onclick="location.reload()">再挑戦</button>
+            <h1 style="color: #f00;">GAME OVER</h1>
+            <button class="btn" onclick="location.reload()">RETRY</button>
         </div>
         <canvas id="c"></canvas>
     </div>
-    <div id="dialog-box">* 用意はいいか？</div>
+    <div id="dialog-box">* 用意はいいか。</div>
 </div>
 
 <div class="controls">
+    <div style="grid-column: 2;"><button class="btn-ctrl" style="width:100%" id="u">↑</button></div>
     <button class="btn-ctrl" id="l">←</button>
-    <button class="btn-ctrl" id="j">JUMP</button>
+    <button class="btn-ctrl" id="d">↓</button>
     <button class="btn-ctrl" id="r">→</button>
 </div>
 
@@ -57,23 +58,15 @@ const ctx = canvas.getContext('2d');
 canvas.width = 600; canvas.height = 400;
 
 let p, hp, bones, blasters, warns, frame, active, keys, shake = 0, flash = 0;
-let phase = 1, phaseTimer = 0, spiralAngle = 0;
-
-const script = [
-    "* 驚いたな、まだやる気か。",
-    "* 少し... 攻撃を荒くしてみよう。",
-    "* はあ... はあ... 息が切れてきたぜ。",
-    "* ...これでおしまいだ！死ね！！",
-    "* ...逃がさない。ずっと俺のターンだ。"
-];
+let phase = 1, phaseTimer = 400, spiralAngle = 0;
 
 function init() {
-    p = { x: 290, y: 300, w: 16, h: 16, vx: 0, vy: 0, ground: false, mode: 'normal' };
+    p = { x: 290, y: 190, w: 16, h: 16, vx: 0, vy: 0 };
     hp = 92; bones = []; blasters = []; warns = []; frame = 0; keys = {};
-    active = true; phase = 1; phaseTimer = 300; spiralAngle = 0;
+    active = true; phase = 1; phaseTimer = 400;
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('death-screen').style.display = 'none';
-    msg(script[0]);
+    msg("* ...無重力にしてやったぜ。");
     loop();
 }
 
@@ -95,70 +88,91 @@ function loop() {
 function update() {
     frame++;
     if (shake > 0) shake *= 0.9;
-    if (flash > 0) flash -= 0.04;
+    if (flash > 0) flash -= 0.05;
 
-    // 移動
-    let grav = (p.mode === 'blue') ? 1.3 : 0.85;
-    if (keys['l']) p.vx = -7.5; else if (keys['r']) p.vx = 7.5; else p.vx *= 0.8;
-    if (keys['j'] && p.ground) { p.vy = -16; p.ground = false; }
-    p.vy += grav; p.x += p.vx; p.y += p.vy;
-    if (p.y > 380 - p.h) { p.y = 380 - p.h; p.vy = 0; p.ground = true; }
+    // 自由移動 (無重力)
+    let speed = 6.5;
+    if (keys['l']) p.vx = -speed; else if (keys['r']) p.vx = speed; else p.vx *= 0.8;
+    if (keys['u']) p.vy = -speed; else if (keys['d']) p.vy = speed; else p.vy *= 0.8;
+    p.x += p.vx; p.y += p.vy;
     p.x = Math.max(0, Math.min(600 - p.w, p.x));
+    p.y = Math.max(0, Math.min(400 - p.h, p.y));
 
     // フェーズ進行
     phaseTimer--;
     if (phaseTimer <= 0) {
         phase++;
-        phaseTimer = 400 - (phase * 30); // 次第に短くなる
-        if(phase <= 5) msg(script[phase-1] || script[4]);
-        p.mode = (phase >= 3 && Math.random() > 0.4) ? 'blue' : 'normal';
-        document.getElementById('turn-info').innerText = "PHASE: " + phase;
+        phaseTimer = 450;
+        document.getElementById('phase-display').innerText = "PHASE: " + phase;
+        if(phase === 2) msg("* 避けるのが得意みたいだな。");
+        if(phase === 3) msg("* ...じゃあ、これはどうだ？");
+        if(phase === 4) msg("* ハハッ！ 荒くなってきだろう？");
+        if(phase === 5) msg("* ...これで終わりだ！死ね！！");
     }
 
-    // --- 攻撃パターン ---
-    
-    // 通常の骨 (PHASE 1-4)
-    if (frame % (Math.max(60, 140 - phase*15)) === 1 && phase < 5) {
-        let s = Math.floor(Math.random() * 5);
-        for(let i=0; i<6; i++) { if(i!==s && i!==s+1) warns.push({x:i*100, w:100, t:50}); }
+    // --- 攻撃生成ロジック ---
+
+    // 骨のクロス攻撃 (横からも来る)
+    if (frame % 120 === 1) {
+        let safe = Math.floor(Math.random() * 5);
+        for(let i=0; i<6; i++) {
+            if(i !== safe) warns.push({x: i*100, y:0, w:100, h:400, t:50, type:'v'});
+        }
+        if(phase >= 3 && frame % 240 === 1) { // 横骨
+            let safeH = Math.floor(Math.random() * 3);
+            for(let i=0; i<4; i++) {
+                if(i !== safeH) warns.push({x: 0, y: i*100, w:600, h:100, t:60, type:'h'});
+            }
+        }
     }
 
-    // 八方渦巻きブラスター (PHASE 4以降)
-    if (phase >= 4 && frame % 15 === 0) {
-        spiralAngle += 0.4;
-        let bx = 300 + Math.cos(spiralAngle) * 150;
-        let by = 200 + Math.sin(spiralAngle) * 150;
-        blasters.push({ x: bx, y: by, tx: 300, ty: 200, timer: 40, beam: 0, rot: spiralAngle + Math.PI });
+    // 渦巻きブラスター (PHASE 4以降)
+    if (phase >= 4 && frame % (20 - phase) === 0) {
+        spiralAngle += 0.35;
+        let bx = 300 + Math.cos(spiralAngle) * 180;
+        let by = 200 + Math.sin(spiralAngle) * 180;
+        blasters.push({ x: bx, y: by, rot: spiralAngle + Math.PI, timer: 35, beam: 0 });
     }
 
-    // 追尾ブラスター (PHASE 2-4)
-    if (phase >= 2 && phase < 5 && frame % 180 === 0) {
-        blasters.push({ x: p.x, y: -50, tx: p.x, ty: 60, timer: 60, beam: 0, rot: Math.PI/2 });
+    // 追尾ブラスター
+    if (frame % 200 === 0 && phase < 5) {
+        blasters.push({ x: p.x, y: -50, rot: Math.PI/2, timer: 55, beam: 0, follow: true });
     }
 
-    // 衝突判定更新
-    warns.forEach((w, i) => { 
-        w.t--; if(w.t === 0) { bones.push({x:w.x+5, y:410, w:90, h:300, timer:0}); warns.splice(i, 1); }
+    // 衝突判定とクリーンアップ
+    warns.forEach((w, i) => {
+        w.t--;
+        if(w.t === 0) {
+            bones.push({ x: w.x, y: w.y, w: w.w, h: w.h, type: w.type, timer: 0 });
+            warns.splice(i, 1);
+        }
     });
+
     bones.forEach((b, i) => {
-        b.timer++; b.y += (b.timer < 15) ? -22 : (b.timer > 40) ? 18 : 0;
-        if(p.x+4 < b.x+b.w && p.x+p.w-4 > b.x && p.y+4 < b.y+b.h && p.y+p.h-4 > b.y) { hp -= 1; shake = 8; }
-        if(b.timer > 60) bones.splice(i, 1);
+        b.timer++;
+        // 突き出し演出
+        let offset = (b.timer < 15) ? (b.timer * 6) : (b.timer > 40) ? (60 - (b.timer-40)*10) : 90;
+        let hit = false;
+        if(b.type === 'v') hit = (p.x+2 < b.x+b.w-2 && p.x+p.w-2 > b.x+2 && p.y < 400 && p.y+p.h > 400-offset);
+        else hit = (p.y+2 < b.y+b.h-2 && p.y+p.h-2 > b.y+2 && p.x < offset);
+
+        if(hit) { hp -= 1.5; shake = 8; }
+        if(b.timer > 55) bones.splice(i, 1);
     });
+
     blasters.forEach((b, i) => {
+        if(b.follow && b.timer > 15) b.x += (p.x - b.x) * 0.1;
         b.timer--;
-        if(b.timer === 0) { b.beam = 15; shake = 10; if(phase >= 4) flash = 0.3; }
+        if(b.timer === 0) { b.beam = 15; shake = 15; flash = 0.4; }
         if(b.beam > 0) {
             b.beam--;
-            // ビームの当たり判定 (回転を考慮した簡易計算)
-            let dx = p.x + 8 - b.x; let dy = p.y + 8 - b.y;
+            let dx = p.x + 8 - b.x, dy = p.y + 8 - b.y;
             let dist = Math.abs(dx * Math.sin(-b.rot) + dy * Math.cos(-b.rot));
-            if(dist < 30) hp -= 2;
+            if(dist < 32) hp -= 2.5;
         }
-        if(b.timer < -20) blasters.splice(i, 1);
+        if(b.timer < -15) blasters.splice(i, 1);
     });
 
-    // UI
     let dHp = Math.max(0, Math.ceil(hp));
     document.getElementById('hp-bar-fill').style.width = (dHp/92*100) + "%";
     document.getElementById('hp-num').innerText = dHp;
@@ -170,37 +184,58 @@ function draw() {
     if(shake > 1) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
     ctx.fillStyle = '#000'; ctx.fillRect(0,0,600,400);
 
-    warns.forEach(w => { ctx.fillStyle = `rgba(255,0,0,0.3)`; ctx.fillRect(w.x,0,w.w,380); });
-    ctx.fillStyle = '#fff'; bones.forEach(b => { ctx.fillRect(b.x,b.y,b.w,b.h); });
+    // 警告
+    warns.forEach(w => {
+        ctx.fillStyle = `rgba(255,0,0,${0.2 + Math.sin(frame*0.2)*0.1})`;
+        ctx.fillRect(w.x, w.y, w.w, w.h);
+    });
 
+    // 骨
+    ctx.fillStyle = '#fff';
+    bones.forEach(b => {
+        let offset = (b.timer < 15) ? (b.timer * 6) : (b.timer > 40) ? (90 - (b.timer-40)*15) : 90;
+        if(b.type === 'v') ctx.fillRect(b.x+5, 400-offset, b.w-10, offset);
+        else ctx.fillRect(0, b.y+5, offset, b.h-10);
+    });
+
+    // ブラスター
     blasters.forEach(b => {
         ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.rot - Math.PI/2);
+        ctx.translate(b.x, b.y); ctx.rotate(b.rot - Math.PI/2);
         ctx.fillStyle = (b.timer < 15 && b.timer > 0 && frame % 4 < 2) ? '#f00' : '#fff';
-        ctx.fillRect(-20, -20, 40, 40); // ヘッド
+        ctx.fillRect(-22, -22, 44, 44);
         if(b.beam > 0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(-30, 20, 60, 800);
-            ctx.fillStyle = '#0ff'; ctx.fillRect(-10, 20, 20, 800);
+            ctx.fillStyle = '#fff'; ctx.fillRect(-35, 20, 70, 1000);
+            ctx.fillStyle = '#0ff'; ctx.fillRect(-12, 20, 24, 1000);
         }
         ctx.restore();
     });
 
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 380, 600, 20);
-    ctx.fillStyle = (p.mode === 'blue') ? '#22f' : '#f00';
+    // ソウル
+    ctx.fillStyle = '#f00'; ctx.beginPath();
     ctx.fillRect(p.x, p.y, p.w, p.h);
+
     if(flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0,0,600,400); }
     ctx.restore();
 }
 
 const setup = (id) => {
     const e = document.getElementById(id);
-    e.onpointerdown = (ev) => { ev.preventDefault(); keys[id] = true; };
-    e.onpointerup = (ev) => { ev.preventDefault(); keys[id] = false; };
+    const start = (ev) => { ev.preventDefault(); keys[id] = true; };
+    const end = (ev) => { ev.preventDefault(); keys[id] = false; };
+    e.addEventListener('pointerdown', start);
+    e.addEventListener('pointerup', end);
+    e.addEventListener('pointerleave', end);
 };
-['l','r','j'].forEach(setup);
-window.onkeydown = e => { if(e.key==='ArrowLeft') keys['l']=true; if(e.key==='ArrowRight') keys['r']=true; if(e.key==='ArrowUp'||e.key===' ') keys['j']=true; };
-window.onkeyup = e => { if(e.key==='ArrowLeft') keys['l']=false; if(e.key==='ArrowRight') keys['r']=false; if(e.key==='ArrowUp'||e.key===' ') keys['j']=false; };
+['u','d','l','r'].forEach(setup);
+window.onkeydown = e => { 
+    if(e.key==='ArrowUp') keys['u']=true; if(e.key==='ArrowDown') keys['d']=true;
+    if(e.key==='ArrowLeft') keys['l']=true; if(e.key==='ArrowRight') keys['r']=true;
+};
+window.onkeyup = e => { 
+    if(e.key==='ArrowUp') keys['u']=false; if(e.key==='ArrowDown') keys['d']=false;
+    if(e.key==='ArrowLeft') keys['l']=false; if(e.key==='ArrowRight') keys['r']=false;
+};
 </script>
 </body>
 </html>
